@@ -235,19 +235,47 @@ function formatAjvError(error: ErrorObject): string {
   return `${path} ${message}`;
 }
 
-export async function generateRecords(schema: any, count: number, edgeCases: boolean): Promise<GenerationOutcome> {
+export async function generateRecords(
+  schema: any,
+  count: number,
+  edgeCaseRatio: number,
+): Promise<GenerationOutcome> {
   const records: any[] = [];
   const generator = async () => {
     const generated = await jsf.resolve(schema);
     return applyPatternAwareValues(schema, generated);
   };
-  for (let i = 0; i < count; i += 1) {
+
+  const targetEdgeCases = Math.min(count, Math.round((edgeCaseRatio / 100) * count));
+  const baseCount = Math.max(0, count - targetEdgeCases);
+
+  for (let i = 0; i < baseCount; i += 1) {
     // eslint-disable-next-line no-await-in-loop
     const record = await generator();
     records.push(record);
   }
-  if (edgeCases) {
-    records.push(createEdgeCaseRecord(schema));
+
+  const edgeCaseRecords: any[] = [];
+  const rootTypes = toTypeList(schema?.type);
+  for (let i = 0; i < targetEdgeCases; i += 1) {
+    if (rootTypes.includes('array')) {
+      edgeCaseRecords.push([makeEdgeCaseValue(schema?.items)]);
+    } else if (rootTypes.length > 0 && !rootTypes.includes('object')) {
+      edgeCaseRecords.push(makeEdgeCaseValue(schema));
+    } else {
+      edgeCaseRecords.push(createEdgeCaseRecord(schema));
+    }
+  }
+
+  edgeCaseRecords.forEach((edgeCase) => {
+    const insertIndex = Math.floor(Math.random() * (records.length + 1));
+    records.splice(insertIndex, 0, edgeCase);
+  });
+
+  while (records.length < count) {
+    // eslint-disable-next-line no-await-in-loop
+    const record = await generator();
+    records.push(record);
   }
 
   const validator = ajv.compile(schema);
