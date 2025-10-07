@@ -25,6 +25,20 @@ Tarayıcı üzerinde çalışan Mock Data Generator uygulaması; JSON Schema, SQ
 
 - `npm run dev`: Geliştirme sunucusunu başlatır.
 - `npm run build`: Üretim derlemesi oluşturur.
+## Geliştirme
+
+```bash
+npm install
+npm run dev
+```
+
+> Not: Çevrimdışı ortamda çalışıyorsanız `npm install` komutu kayıtlı npm mirror’larına erişemeyebilir.
+
+## Derleme
+
+```bash
+npm run build
+```
 
 ## Lisans
 

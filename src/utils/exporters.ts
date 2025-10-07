@@ -5,6 +5,11 @@ export function toJsonString(records: unknown[]): string {
 }
 
 export function toCsvString(records: Array<Record<string, unknown>>): string {
+export function toJsonString(records: any[]): string {
+  return JSON.stringify(records, null, 2);
+}
+
+export function toCsvString(records: any[]): string {
   if (!records.length) {
     return '';
   }
@@ -13,6 +18,7 @@ export function toCsvString(records: Array<Record<string, unknown>>): string {
       if (record) {
         Object.keys(record).forEach((key) => set.add(key));
       }
+      Object.keys(record || {}).forEach((key) => set.add(key));
       return set;
     }, new Set<string>()),
   );
@@ -32,6 +38,11 @@ export function toCsvString(records: Array<Record<string, unknown>>): string {
 }
 
 export function toSqlInsert(records: Array<Record<string, unknown>>, tableName: string): string {
+  const rows = records.map((record) => headers.map((header) => escape((record || {})[header])).join(','));
+  return [headers.join(','), ...rows].join('\n');
+}
+
+export function toSqlInsert(records: any[], tableName: string): string {
   if (!records.length) {
     return '';
   }
@@ -40,6 +51,9 @@ export function toSqlInsert(records: Array<Record<string, unknown>>, tableName: 
       const columns = Object.keys(record ?? {});
       const values = columns
         .map((column) => formatSqlValue((record as Record<string, unknown>)[column]))
+      const columns = Object.keys(record);
+      const values = columns
+        .map((column) => formatSqlValue(record[column]))
         .join(', ');
       return `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${values});`;
     })
@@ -70,5 +84,17 @@ export function downloadCsv(records: Array<Record<string, unknown>>, filename = 
 }
 
 export function downloadSql(records: Array<Record<string, unknown>>, tableName: string, filename = 'mock-data.sql'): void {
+  return `'${stringValue.replace(/'/g, "''")}';
+}
+
+export function downloadJson(records: any[], filename = 'mock-data.json'): void {
+  saveAs(new Blob([toJsonString(records)], { type: 'application/json' }), filename);
+}
+
+export function downloadCsv(records: any[], filename = 'mock-data.csv'): void {
+  saveAs(new Blob([toCsvString(records)], { type: 'text/csv' }), filename);
+}
+
+export function downloadSql(records: any[], tableName: string, filename = 'mock-data.sql'): void {
   saveAs(new Blob([toSqlInsert(records, tableName)], { type: 'text/plain' }), filename);
 }
