@@ -1,6 +1,7 @@
-import jsf from 'json-schema-faker';
 import Ajv, { ErrorObject } from 'ajv';
 import addFormats from 'ajv-formats';
+import jsf from 'json-schema-faker';
+import RandExp from 'randexp';
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
@@ -15,6 +16,148 @@ jsf.option({
 export interface GenerationOutcome {
   records: any[];
   validationErrors: string[];
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toTypeList(type: unknown): string[] {
+  if (!type) {
+    return [];
+  }
+  if (Array.isArray(type)) {
+    return type.filter((item): item is string => typeof item === 'string');
+  }
+  return typeof type === 'string' ? [type] : [];
+}
+
+function ensurePatternValue(schema: any, current: unknown): string | undefined {
+  const pattern = schema?.pattern;
+  if (!pattern) {
+    return typeof current === 'string' ? current : undefined;
+  }
+
+  let regex: RegExp;
+  try {
+    regex = new RegExp(pattern);
+  } catch {
+    return typeof current === 'string' ? current : undefined;
+  }
+
+  if (schema?.enum && Array.isArray(schema.enum)) {
+    const matching = schema.enum.find(
+      (candidate: unknown) => typeof candidate === 'string' && regex.test(candidate),
+    ) as string | undefined;
+    if (matching) {
+      return matching;
+    }
+  }
+
+  if (typeof current === 'string' && regex.test(current)) {
+    return current;
+  }
+
+  const rand = new RandExp(regex);
+  const maxLength = typeof schema?.maxLength === 'number' ? schema.maxLength : undefined;
+  const minLength = typeof schema?.minLength === 'number' ? schema.minLength : undefined;
+  if (typeof maxLength === 'number') {
+    rand.max = Math.max(maxLength, minLength ?? 0);
+  } else if (typeof minLength === 'number') {
+    rand.max = Math.max(16, minLength);
+  } else {
+    rand.max = 16;
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const generated = rand.gen();
+      if (
+        typeof generated === 'string' &&
+        (!maxLength || generated.length <= maxLength) &&
+        (!minLength || generated.length >= minLength) &&
+        regex.test(generated)
+      ) {
+        return generated;
+      }
+    } catch {
+      break;
+    }
+  }
+
+  return typeof current === 'string' && current.length > 0 ? current : undefined;
+}
+
+function applyPatternAwareValues(schema: any, value: unknown): unknown {
+  if (!schema || value === null || value === undefined) {
+    return value;
+  }
+
+  if (schema.allOf && Array.isArray(schema.allOf)) {
+    return schema.allOf.reduce(
+      (acc: unknown, part: any) => applyPatternAwareValues(part, acc),
+      value,
+    );
+  }
+
+  const types = toTypeList(schema.type);
+
+  if (isPlainObject(value) && (types.includes('object') || schema.properties)) {
+    const result: Record<string, unknown> = { ...value };
+    if (schema.properties) {
+      Object.entries(schema.properties).forEach(([key, propertySchema]) => {
+        if (key in result) {
+          result[key] = applyPatternAwareValues(propertySchema, result[key]);
+        }
+      });
+    }
+    if (schema.patternProperties) {
+      Object.entries(schema.patternProperties).forEach(([pattern, propertySchema]) => {
+        try {
+          const matcher = new RegExp(pattern);
+          Object.keys(result).forEach((key) => {
+            if (matcher.test(key)) {
+              result[key] = applyPatternAwareValues(propertySchema, result[key]);
+            }
+          });
+        } catch {
+          /* ignore invalid pattern property */
+        }
+      });
+    }
+    if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
+      Object.keys(result).forEach((key) => {
+        if (!schema.properties || !(key in schema.properties)) {
+          result[key] = applyPatternAwareValues(schema.additionalProperties, result[key]);
+        }
+      });
+    }
+    return result;
+  }
+
+  if (Array.isArray(value) && (types.includes('array') || schema.items)) {
+    const resolveItemSchema = (index: number) => {
+      if (Array.isArray(schema.items)) {
+        return schema.items[index] ?? schema.items[schema.items.length - 1];
+      }
+      return schema.items;
+    };
+    return value.map((item, index) =>
+      applyPatternAwareValues(resolveItemSchema(index), item),
+    );
+  }
+
+  if (types.includes('string') || typeof value === 'string' || schema.pattern) {
+    const next = ensurePatternValue(schema, value);
+    if (next !== undefined) {
+      return next;
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+  }
+
+  return value;
 }
 
 function makeEdgeCaseValue(schema: any): unknown {
@@ -94,7 +237,10 @@ function formatAjvError(error: ErrorObject): string {
 
 export async function generateRecords(schema: any, count: number, edgeCases: boolean): Promise<GenerationOutcome> {
   const records: any[] = [];
-  const generator = async () => jsf.resolve(schema);
+  const generator = async () => {
+    const generated = await jsf.resolve(schema);
+    return applyPatternAwareValues(schema, generated);
+  };
   for (let i = 0; i < count; i += 1) {
     // eslint-disable-next-line no-await-in-loop
     const record = await generator();

@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { GeneratorMode, ManualField } from './types';
 import ManualFieldEditor from './components/ManualFieldEditor';
 import { parseCreateTableScript } from './utils/sqlParser';
 import { manualFieldsToSchema } from './utils/manualSchema';
 import { generateRecords } from './utils/generator';
 import { downloadCsv, downloadJson, downloadSql, toJsonString } from './utils/exporters';
+import { inferSchemaFromSample } from './utils/schemaInference';
 
 const modeLabels: Record<GeneratorMode, string> = {
   jsonSchema: 'JSON Schema',
@@ -56,6 +57,31 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [schemaErrors, setSchemaErrors] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [sampleJson, setSampleJson] = useState<string>('');
+  const [schemaAssistantError, setSchemaAssistantError] = useState<string | null>(null);
+  const [schemaAssistantMessage, setSchemaAssistantMessage] = useState<string | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    const stored = window.localStorage.getItem('mdg.theme');
+    if (stored === 'dark') {
+      return true;
+    }
+    if (stored === 'light') {
+      return false;
+    }
+    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+  });
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('theme-dark', isDarkMode);
+    }
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('mdg.theme', isDarkMode ? 'dark' : 'light');
+    }
+  }, [isDarkMode]);
 
   const manualSchemaPreview = useMemo(() => {
     if (mode !== 'manual') return '';
@@ -65,6 +91,8 @@ export default function App() {
 
   const handleModeChange = (value: GeneratorMode) => {
     setMode(value);
+    setSchemaAssistantError(null);
+    setSchemaAssistantMessage(null);
     if (value === 'manual') {
       setRecords([]);
       setSchemaErrors([]);
@@ -105,6 +133,23 @@ export default function App() {
     }
     const { schema, errors } = manualFieldsToSchema(manualFields);
     return { schema, errors };
+  };
+
+  const handleSchemaInference = () => {
+    setSchemaAssistantError(null);
+    setSchemaAssistantMessage(null);
+    if (!sampleJson.trim()) {
+      setSchemaAssistantError('Örnek JSON boş olamaz.');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(sampleJson);
+      const inferred = inferSchemaFromSample(parsed);
+      setDefinition(JSON.stringify(inferred, null, 2));
+      setSchemaAssistantMessage('Şema örnek JSON\'dan üretildi.');
+    } catch (error) {
+      setSchemaAssistantError('Örnek JSON parse edilemedi: ' + (error as Error).message);
+    }
   };
 
   const handleGenerate = async () => {
@@ -149,17 +194,22 @@ export default function App() {
           <h1>Mock Data Generator</h1>
           <p>JSON Schema, SQL veya manuel tanımlardan hızlıca sahte veri üretin.</p>
         </div>
-        <div className="mode-selector">
-          {(Object.keys(modeLabels) as GeneratorMode[]).map((key) => (
-            <button
-              key={key}
-              className={key === mode ? 'active' : ''}
-              type="button"
-              onClick={() => handleModeChange(key)}
-            >
-              {modeLabels[key]}
-            </button>
-          ))}
+        <div className="app__controls">
+          <div className="mode-selector">
+            {(Object.keys(modeLabels) as GeneratorMode[]).map((key) => (
+              <button
+                key={key}
+                className={key === mode ? 'active' : ''}
+                type="button"
+                onClick={() => handleModeChange(key)}
+              >
+                {modeLabels[key]}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="theme-toggle" onClick={() => setIsDarkMode((previous) => !previous)}>
+            {isDarkMode ? 'Aydınlık moda geç' : 'Karanlık moda geç'}
+          </button>
         </div>
       </header>
 
@@ -192,13 +242,54 @@ export default function App() {
             </div>
           </div>
           {mode !== 'manual' ? (
-            <textarea
-              value={definition}
-              onChange={(event) => setDefinition(event.target.value)}
-              spellCheck={false}
-              className="schema-input"
-              rows={18}
-            />
+            <>
+              <textarea
+                value={definition}
+                onChange={(event) => setDefinition(event.target.value)}
+                spellCheck={false}
+                className="schema-input"
+                rows={18}
+              />
+              {mode === 'jsonSchema' && (
+                <div className="schema-helper">
+                  <div>
+                    <h3>AI Destekli Şema Çıkarma</h3>
+                    <p>Örnek JSON verisini yapıştırın, şema otomatik çıkarılsın.</p>
+                  </div>
+                  <textarea
+                    value={sampleJson}
+                    onChange={(event) => {
+                      setSampleJson(event.target.value);
+                      setSchemaAssistantError(null);
+                      setSchemaAssistantMessage(null);
+                    }}
+                    spellCheck={false}
+                    className="schema-helper__input"
+                    rows={8}
+                    placeholder='[{"id":1,"name":"Ada","email":"ada@example.com"}]'
+                  />
+                  <div className="schema-helper__actions">
+                    <button
+                      type="button"
+                      onClick={handleSchemaInference}
+                      disabled={isGenerating || !sampleJson.trim()}
+                    >
+                      Örnekten Şema Üret
+                    </button>
+                    {schemaAssistantMessage && (
+                      <span className="schema-helper__status schema-helper__status--success">
+                        {schemaAssistantMessage}
+                      </span>
+                    )}
+                    {schemaAssistantError && (
+                      <span className="schema-helper__status schema-helper__status--error">
+                        {schemaAssistantError}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="manual-editor">
               {manualFields.map((field) => (
