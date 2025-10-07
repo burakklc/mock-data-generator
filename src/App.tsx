@@ -65,6 +65,7 @@ export default function App() {
   const [schemaAssistantError, setSchemaAssistantError] = useState<string | null>(null);
   const [schemaAssistantMessage, setSchemaAssistantMessage] = useState<string | null>(null);
   const [copiedExample, setCopiedExample] = useState<string | null>(null);
+  const [isNavOpen, setIsNavOpen] = useState<boolean>(false);
   const copyResetTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
@@ -81,9 +82,21 @@ export default function App() {
   });
 
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('theme-dark', isDarkMode);
+    if (typeof document === 'undefined') {
+      return;
     }
+    const root = document.documentElement;
+    root.classList.toggle('theme-dark', isDarkMode);
+    root.classList.add('theme-transition');
+    const timer = window.setTimeout(() => {
+      root.classList.remove('theme-transition');
+    }, 320);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isDarkMode]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('mdg.theme', isDarkMode ? 'dark' : 'light');
     }
@@ -99,10 +112,53 @@ export default function App() {
   );
 
   useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+    const { style } = document.body;
+    const previousOverflow = style.overflow;
+    style.overflow = isNavOpen ? 'hidden' : previousOverflow || '';
+    return () => {
+      style.overflow = previousOverflow;
+    };
+  }, [isNavOpen]);
+
+  useEffect(() => {
+    if (!isNavOpen || typeof window === 'undefined') {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsNavOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isNavOpen]);
+
+  useEffect(() => {
     if (activeDefinitionTab !== 'examples') {
       setCopiedExample(null);
     }
   }, [activeDefinitionTab]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setIsNavOpen(false);
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   const manualSchemaPreview = useMemo(() => {
     if (mode !== 'manual') return '';
@@ -112,12 +168,20 @@ export default function App() {
 
   const currentExamples = useMemo(() => exampleSnippets[mode], [mode]);
 
+  const closeNav = () => setIsNavOpen(false);
+
+  const handleMainTabChange = (tab: 'generator' | 'howTo') => {
+    setActiveMainTab(tab);
+    closeNav();
+  };
+
   const handleModeChange = (value: GeneratorMode) => {
     setMode(value);
     setActiveDefinitionTab('definition');
     setCopiedExample(null);
     setSchemaAssistantError(null);
     setSchemaAssistantMessage(null);
+    closeNav();
     if (value === 'manual') {
       setRecords([]);
       setSchemaErrors([]);
@@ -244,44 +308,70 @@ export default function App() {
   return (
     <div className="app">
       <header className="app__header">
-        <div>
-          <h1>Mock Data Generator</h1>
-          <p>JSON Schema, SQL veya manuel tanımlardan hızlıca sahte veri üretin.</p>
-        </div>
-        <div className="app__controls">
-          <div className="view-tabs">
-            <button
-              type="button"
-              className={activeMainTab === 'generator' ? 'active' : ''}
-              onClick={() => setActiveMainTab('generator')}
-            >
-              Veri Üretici
-            </button>
-            <button
-              type="button"
-              className={activeMainTab === 'howTo' ? 'active' : ''}
-              onClick={() => setActiveMainTab('howTo')}
-            >
-              Nasıl Kullanılır?
-            </button>
+        <div className="app__brand">
+          <div className="brand-mark" aria-hidden="true">
+            MD
           </div>
-          <div className="mode-selector">
-            {(Object.keys(modeLabels) as GeneratorMode[]).map((key) => (
-              <button
-                key={key}
-                className={key === mode ? 'active' : ''}
-                type="button"
-                onClick={() => handleModeChange(key)}
-              >
-                {modeLabels[key]}
+          <div className="brand-copy">
+            <h1>Mock Data Generator</h1>
+            <p>JSON Schema, SQL veya manuel tanımlardan hızlıca sahte veri üretin.</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className={`menu-toggle ${isNavOpen ? 'is-active' : ''}`}
+          onClick={() => setIsNavOpen((previous) => !previous)}
+          aria-label={isNavOpen ? 'Navigasyonu kapat' : 'Navigasyonu aç'}
+          aria-expanded={isNavOpen}
+          aria-controls="app-navigation"
+        >
+          <span className="menu-icon" />
+        </button>
+        <nav id="app-navigation" className={`app__nav ${isNavOpen ? 'is-open' : ''}`}>
+          <div className="nav-inner">
+            <div className="nav-section">
+              <span className="nav-label">Görünüm</span>
+              <div className="view-tabs">
+                <button
+                  type="button"
+                  className={activeMainTab === 'generator' ? 'active' : ''}
+                  onClick={() => handleMainTabChange('generator')}
+                >
+                  Veri Üretici
+                </button>
+                <button
+                  type="button"
+                  className={activeMainTab === 'howTo' ? 'active' : ''}
+                  onClick={() => handleMainTabChange('howTo')}
+                >
+                  Nasıl Kullanılır?
+                </button>
+              </div>
+            </div>
+            <div className="nav-section">
+              <span className="nav-label">Mod</span>
+              <div className="mode-selector">
+                {(Object.keys(modeLabels) as GeneratorMode[]).map((key) => (
+                  <button
+                    key={key}
+                    className={key === mode ? 'active' : ''}
+                    type="button"
+                    onClick={() => handleModeChange(key)}
+                  >
+                    {modeLabels[key]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="nav-footer">
+              <button type="button" className="theme-toggle" onClick={() => setIsDarkMode((previous) => !previous)}>
+                {isDarkMode ? 'Aydınlık moda geç' : 'Karanlık moda geç'}
               </button>
-            ))}
+            </div>
           </div>
-          <button type="button" className="theme-toggle" onClick={() => setIsDarkMode((previous) => !previous)}>
-            {isDarkMode ? 'Aydınlık moda geç' : 'Karanlık moda geç'}
-          </button>
-        </div>
+        </nav>
       </header>
+      {isNavOpen && <div className="nav-overlay" aria-hidden="true" onClick={closeNav} />}
 
       {activeMainTab === 'generator' ? (
         <main className="layout">
