@@ -11,6 +11,20 @@ Tarayıcı üzerinde çalışan Mock Data Generator uygulaması; JSON Schema, SQ
 - **Dışa aktarma:** JSON, CSV veya SQL formatında veri indirme seçenekleri sunar.
 - **Önizleme:** İlk 20 kaydı tablo ve JSON formatında görüntüler.
 
+## Hızlı Başlangıç (Basit Anlatım)
+
+1. **Projeyi GitHub’dan indir:** Sağ üstteki yeşil `Code` düğmesine tıklayıp `Download ZIP` seçebilirsiniz veya Git kuruluysa `git clone https://github.com/<kullanıcı-adı>/mock-data-generator.git` komutunu çalıştırabilirsiniz.
+2. **Bilgisayarınızda açın:** ZIP indirdiyseniz klasörü çıkarın; klonladıysanız komut satırı sizi proje klasörüne götürür (`cd mock-data-generator`).
+3. **Bağımlılıkları yükleyin:** Proje klasöründe bir terminal açıp `npm install` yazın. Bu adım internet bağlantısı gerektirir.
+4. **Uygulamayı başlatın:** Aynı terminalde `npm run dev` komutu ile geliştirme sunucusunu çalıştırın ve ekranda çıkan adresi (genelde http://localhost:5173) tarayıcıda açın.
+5. **Hazırsınız:** Arayüz üzerinden JSON Schema, SQL `CREATE TABLE` ya da manuel tanımlar girerek sahte veri oluşturabilirsiniz.
+
+> Not: Çevrimdışı bir ortamda çalışıyorsanız `npm install` komutu gerekli paket depolarına ulaşamadığı için başarısız olabilir.
+
+## Geliştirme Komutları
+
+- `npm run dev`: Geliştirme sunucusunu başlatır.
+- `npm run build`: Üretim derlemesi oluşturur.
 ## Geliştirme
 
 ```bash
