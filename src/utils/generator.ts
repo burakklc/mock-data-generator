@@ -1,8 +1,13 @@
 import Ajv, { ErrorObject } from 'ajv';
 import addFormats from 'ajv-formats';
-import { JSONPath } from 'jsonpath-plus';
-import $RefParser from 'json-schema-ref-parser';
 import RandExp from 'randexp';
+
+const globalObject = globalThis as Record<string, any>;
+if (!globalObject.process) {
+  globalObject.process = { env: {} };
+} else if (!globalObject.process.env) {
+  globalObject.process.env = {};
+}
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
@@ -14,15 +19,6 @@ let jsfPromise: Promise<JsonSchemaFaker> | null = null;
 async function getJsonSchemaFaker(): Promise<JsonSchemaFaker> {
   if (!jsfPromise) {
     jsfPromise = (async () => {
-      if (typeof globalThis !== 'undefined') {
-        const globalTarget = globalThis as Record<string, unknown>;
-        if (!globalTarget.JSONPath) {
-          globalTarget.JSONPath = JSONPath;
-        }
-        if (!globalTarget.$RefParser) {
-          globalTarget.$RefParser = $RefParser;
-        }
-      }
       const module = await import('json-schema-faker');
       const instance = module.default;
       instance.option({
@@ -266,8 +262,8 @@ export async function generateRecords(
 ): Promise<GenerationOutcome> {
   const jsf = await getJsonSchemaFaker();
   const records: any[] = [];
-  const generator = async () => {
-    const generated = await jsf.resolve(schema);
+  const generator = () => {
+    const generated = jsf.generate(schema);
     return applyPatternAwareValues(schema, generated);
   };
 
@@ -275,8 +271,7 @@ export async function generateRecords(
   const baseCount = Math.max(0, count - targetEdgeCases);
 
   for (let i = 0; i < baseCount; i += 1) {
-    // eslint-disable-next-line no-await-in-loop
-    const record = await generator();
+    const record = generator();
     records.push(record);
   }
 
@@ -298,8 +293,7 @@ export async function generateRecords(
   });
 
   while (records.length < count) {
-    // eslint-disable-next-line no-await-in-loop
-    const record = await generator();
+    const record = generator();
     records.push(record);
   }
 
