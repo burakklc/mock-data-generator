@@ -698,6 +698,7 @@ textarea:focus {
 .examples-list {
   display: grid;
   gap: 1.25rem;
+  min-width: 0;
 }
 
 .example-card {
@@ -711,6 +712,7 @@ textarea:focus {
   box-shadow: 0 22px 44px -30px rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+  min-width: 0;
 }
 
 .example-card header {
