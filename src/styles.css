@@ -778,6 +778,7 @@ textarea:focus {
 
 .edge-slider input[type='range'] {
   -webkit-appearance: none;
+  appearance: none;
   width: 180px;
   height: 6px;
   border-radius: 999px;
@@ -787,6 +788,7 @@ textarea:focus {
 
 .edge-slider input[type='range']::-webkit-slider-thumb {
   -webkit-appearance: none;
+  appearance: none;
   width: 18px;
   height: 18px;
   border-radius: 50%;
