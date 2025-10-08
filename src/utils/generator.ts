@@ -1,17 +1,41 @@
 import Ajv, { ErrorObject } from 'ajv';
 import addFormats from 'ajv-formats';
-import jsf from 'json-schema-faker';
+import { JSONPath } from 'jsonpath-plus';
+import $RefParser from 'json-schema-ref-parser';
 import RandExp from 'randexp';
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
 
-jsf.option({
-  alwaysFakeOptionals: true,
-  fillProperties: true,
-  useExamplesValue: true,
-  useDefaultValue: true,
-});
+type JsonSchemaFaker = typeof import('json-schema-faker')['default'];
+
+let jsfPromise: Promise<JsonSchemaFaker> | null = null;
+
+async function getJsonSchemaFaker(): Promise<JsonSchemaFaker> {
+  if (!jsfPromise) {
+    jsfPromise = (async () => {
+      if (typeof globalThis !== 'undefined') {
+        const globalTarget = globalThis as Record<string, unknown>;
+        if (!globalTarget.JSONPath) {
+          globalTarget.JSONPath = JSONPath;
+        }
+        if (!globalTarget.$RefParser) {
+          globalTarget.$RefParser = $RefParser;
+        }
+      }
+      const module = await import('json-schema-faker');
+      const instance = module.default;
+      instance.option({
+        alwaysFakeOptionals: true,
+        fillProperties: true,
+        useExamplesValue: true,
+        useDefaultValue: true,
+      });
+      return instance;
+    })();
+  }
+  return jsfPromise;
+}
 
 export interface GenerationOutcome {
   records: any[];
@@ -240,6 +264,7 @@ export async function generateRecords(
   count: number,
   edgeCaseRatio: number,
 ): Promise<GenerationOutcome> {
+  const jsf = await getJsonSchemaFaker();
   const records: any[] = [];
   const generator = async () => {
     const generated = await jsf.resolve(schema);
