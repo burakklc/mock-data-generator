@@ -45,6 +45,7 @@ npm run build
 - `@vercel/analytics` paketi projeye eklendi ve `src/main.tsx` içinde `<Analytics />` bileşeni yerleştirildi.
 - Vercel panelinde ilgili projede **Analytics** özelliğini etkinleştirerek üretim trafiğini izleyebilirsiniz.
 - Analytics yalnızca Vercel üzerinde çalışan deploy’larda veri toplayacaktır; yerelde çalışırken ek bir ayara gerek yoktur.
+- Google Analytics için `index.html` dosyasına `G-EMEEEJT4CC` kimliğini kullanan gtag snippet’i eklendi.
 
 ## Lisans
 
