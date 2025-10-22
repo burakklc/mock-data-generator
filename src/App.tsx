@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { GeneratorMode, ManualField } from './types';
 import ManualFieldEditor from './components/ManualFieldEditor';
 import { parseCreateTableScript } from './utils/sqlParser';
@@ -14,6 +14,150 @@ const modeLabels: Record<GeneratorMode, string> = {
   createTable: 'CREATE TABLE',
   manual: 'Manuel Tanım',
 };
+
+const modeCardDetails: Record<
+  GeneratorMode,
+  { title: string; description: string; icon: ReactNode; highlight: string }
+> = {
+  jsonSchema: {
+    title: 'JSON Schema',
+    description: 'Örnekten şema çıkarın, validasyonu geçecek kayıtlar oluşturun.',
+    highlight: 'AJV ile doğrulandı',
+    icon: (
+      <svg viewBox="0 0 24 24" focusable="false" role="img" aria-hidden="true">
+        <path
+          d="M6.5 3A2.5 2.5 0 0 0 4 5.5v13A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V8.414a2.5 2.5 0 0 0-.732-1.768l-3.914-3.914A2.5 2.5 0 0 0 13.586 2H6.5z"
+          fill="currentColor"
+        />
+        <path
+          d="M14 2.75v4a1.25 1.25 0 0 0 1.25 1.25h4"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M8 14.5h8M8 17.5h5"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <rect
+          x="8"
+          y="9.5"
+          width="8"
+          height="2"
+          rx="1"
+          fill="currentColor"
+          opacity="0.65"
+        />
+      </svg>
+    ),
+  },
+  createTable: {
+    title: 'CREATE TABLE',
+    description: 'SQL tablo tanımlarından kolon tiplerini algılayın, INSERT scriptlerini indirin.',
+    highlight: 'INSERT script hazır',
+    icon: (
+      <svg viewBox="0 0 24 24" focusable="false" role="img" aria-hidden="true">
+        <path
+          d="M5 5.5A2.5 2.5 0 0 1 7.5 3h9A2.5 2.5 0 0 1 19 5.5v13A2.5 2.5 0 0 1 16.5 21h-9A2.5 2.5 0 0 1 5 18.5v-13z"
+          fill="currentColor"
+        />
+        <path
+          d="M8 8h8M8 11.5h8M8 15h5"
+          stroke="var(--color-button-text)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M8.25 18H11"
+          stroke="var(--color-button-text)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </svg>
+    ),
+  },
+  manual: {
+    title: 'Manuel Tanım',
+    description: 'Sıfırdan alanlar ekleyin, JSON Schema çıktısını düzenleyin ve paylaşın.',
+    highlight: 'Anında şema çıktısı',
+    icon: (
+      <svg viewBox="0 0 24 24" focusable="false" role="img" aria-hidden="true">
+        <path
+          d="M6.75 4A2.75 2.75 0 0 0 4 6.75v10.5A2.75 2.75 0 0 0 6.75 20H17.5l2.5-2.5V6.75A2.75 2.75 0 0 0 17.25 4h-10.5z"
+          fill="currentColor"
+        />
+        <path
+          d="M9 8.5h6M9 12h6"
+          stroke="var(--color-button-text)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M9 15.5h3.5"
+          stroke="var(--color-button-text)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <path
+          d="M17 21v-3l3 3h-3z"
+          fill="var(--color-button-text)"
+        />
+      </svg>
+    ),
+  },
+};
+
+const definitionTabMeta: Record<'definition' | 'examples', { label: string; icon: ReactNode }> = {
+  definition: {
+    label: 'Tanım',
+    icon: (
+      <svg viewBox="0 0 20 20" focusable="false" role="img" aria-hidden="true">
+        <rect x="3.5" y="3.5" width="13" height="13" rx="2.5" fill="currentColor" opacity="0.16" />
+        <path
+          d="M6 7.75h8M6 10h5"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+        <rect x="6" y="12.25" width="4" height="1.5" rx="0.75" fill="currentColor" />
+      </svg>
+    ),
+  },
+  examples: {
+    label: 'Örnekler',
+    icon: (
+      <svg viewBox="0 0 20 20" focusable="false" role="img" aria-hidden="true">
+        <rect x="3.5" y="3.5" width="13" height="13" rx="2.5" fill="currentColor" opacity="0.16" />
+        <path
+          d="M8.5 7.5 6.5 10l2 2.5M11.5 7.5l2 2.5-2 2.5"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </svg>
+    ),
+  },
+};
+
+const definitionTabsOrder: Array<'definition' | 'examples'> = ['definition', 'examples'];
 
 const initialSchema = `{
   "$schema": "http://json-schema.org/draft-07/schema#",
@@ -67,6 +211,7 @@ export default function App() {
   const [copiedExample, setCopiedExample] = useState<string | null>(null);
   const [isNavOpen, setIsNavOpen] = useState<boolean>(false);
   const copyResetTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const definitionPanelRef = useRef<HTMLDivElement | null>(null);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
       return false;
@@ -364,8 +509,40 @@ export default function App() {
               </div>
             </div>
             <div className="nav-footer">
-              <button type="button" className="theme-toggle" onClick={() => setIsDarkMode((previous) => !previous)}>
-                {isDarkMode ? 'Aydınlık moda geç' : 'Karanlık moda geç'}
+              <button
+                type="button"
+                className={`theme-toggle ${isDarkMode ? 'is-dark' : ''}`}
+                onClick={() => setIsDarkMode((previous) => !previous)}
+                aria-pressed={isDarkMode}
+                aria-label={isDarkMode ? 'Aydınlık temaya geç' : 'Karanlık temaya geç'}
+                title={isDarkMode ? 'Aydınlık temaya geç' : 'Karanlık temaya geç'}
+              >
+                <span className="theme-toggle__icon" aria-hidden="true">
+                  {isDarkMode ? (
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M15.25 4.5a.75.75 0 0 0-.71 1 6.5 6.5 0 1 1-8.04 8.04.75.75 0 0 0-1 .71 8 8 0 1 0 9.75-9.75z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="4.5" fill="currentColor" />
+                      <path
+                        d="M12 3v1.5M12 19.5V21M4.5 12H3M21 12h-1.5M6.22 6.22 5.16 5.16M18.84 18.84l-1.06-1.06M6.22 17.78 5.16 18.84M18.84 5.16l-1.06 1.06"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
+                </span>
+                <span className="theme-toggle__copy">
+                  <span className="theme-toggle__label">
+                    {isDarkMode ? 'Karanlık tema aktif' : 'Aydınlık tema aktif'}
+                  </span>
+                  <span className="theme-toggle__caption">Geçiş yap</span>
+                </span>
               </button>
             </div>
           </div>
@@ -374,9 +551,67 @@ export default function App() {
       {isNavOpen && <div className="nav-overlay" aria-hidden="true" onClick={closeNav} />}
 
       {activeMainTab === 'generator' ? (
-        <main className="layout">
-          <section className="panel">
-            <div className="panel__header">
+        <>
+          <section className="hero">
+            <div className="hero__content">
+              <h2>Test verinizi dakikalar içinde hazırlayın</h2>
+              <p>
+                Mock Data Generator, şemanızı doğrularken farklı formatlarda mock veri oluşturur. Edge case’leri deneyin,
+                çıktıyı indirin ve ekibinizle paylaşın.
+              </p>
+              <div className="hero__actions">
+                <button
+                  type="button"
+                  className="hero__cta"
+                  onClick={() => definitionPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                >
+                  Veri üretmeye başla
+                </button>
+                <button type="button" className="hero__secondary" onClick={() => handleMainTabChange('howTo')}>
+                  Nasıl çalışır?
+                </button>
+              </div>
+              <ul className="hero__highlights">
+                <li>JSON, CSV ve SQL formatlarında dışa aktarma</li>
+                <li>Edge case ve validasyon uyarılarıyla güvenilir veri</li>
+                <li>Tamamı tarayıcıda, verileriniz güvende</li>
+              </ul>
+            </div>
+            <div className="hero__modes">
+              <span className="hero__modes-label">Üretim modu</span>
+              <div className="mode-cards">
+                {(Object.keys(modeCardDetails) as GeneratorMode[]).map((key) => {
+                  const details = modeCardDetails[key];
+                  const isActive = mode === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`mode-card ${isActive ? 'is-active' : ''}`}
+                      onClick={() => handleModeChange(key)}
+                      aria-pressed={isActive}
+                      aria-label={`${details.title}: ${details.description}`}
+                    >
+                      <span className="mode-card__icon" aria-hidden="true">
+                        {details.icon}
+                      </span>
+                      <div className="mode-card__body">
+                        <div className="mode-card__meta">
+                          <span className="mode-card__highlight">{details.highlight}</span>
+                          <h3>{details.title}</h3>
+                        </div>
+                        <p>{details.description}</p>
+                      </div>
+                      {isActive && <span className="mode-card__status">Seçili</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+          <main className="layout">
+            <section className="panel panel--definition" ref={definitionPanelRef}>
+              <div className="panel__header">
               <h2>Yapı Tanımı</h2>
               <div className="panel__actions">
                 <label>
@@ -432,20 +667,23 @@ export default function App() {
             </details>
 
             <div className="definition-tabs">
-              <button
-                type="button"
-                className={activeDefinitionTab === 'definition' ? 'active' : ''}
-                onClick={() => setActiveDefinitionTab('definition')}
-              >
-                Tanım
-              </button>
-              <button
-                type="button"
-                className={activeDefinitionTab === 'examples' ? 'active' : ''}
-                onClick={() => setActiveDefinitionTab('examples')}
-              >
-                Örnekler
-              </button>
+              {definitionTabsOrder.map((tabKey) => {
+                const tab = definitionTabMeta[tabKey];
+                const isActive = activeDefinitionTab === tabKey;
+                return (
+                  <button
+                    key={tabKey}
+                    type="button"
+                    className={isActive ? 'active' : ''}
+                    onClick={() => setActiveDefinitionTab(tabKey)}
+                  >
+                    <span className="tab-icon" aria-hidden="true">
+                      {tab.icon}
+                    </span>
+                    <span className="tab-label">{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {activeDefinitionTab === 'definition' ? (
@@ -551,24 +789,129 @@ export default function App() {
             )}
           </section>
 
-          <section className="panel">
-            <div className="panel__header">
-              <h2>Önizleme & Dışa Aktarım</h2>
-              <div className="panel__actions">
-                <button type="button" onClick={() => downloadJson(records)} disabled={exportDisabled}>
-                  JSON indir
-                </button>
-                <button type="button" onClick={() => downloadCsv(records)} disabled={exportDisabled}>
-                  CSV indir
-                </button>
-                <button
-                  type="button"
-                  onClick={() => downloadSql(records, tableName || 'mock_data')}
-                  disabled={exportDisabled}
-                >
-                  SQL INSERT indir
-                </button>
+          <section className="panel panel--preview">
+            <div className="panel__header panel__header--stack">
+              <div className="panel__title">
+                <h2>Önizleme & Dışa Aktarım</h2>
+                <p className="panel__subtitle">Formatı seçin, tek tuşla paylaşın.</p>
               </div>
+              {records.length > 0 && (
+                <div className="preview-meta">
+                  <span className="preview-chip">{records.length} kayıt</span>
+                  <span className="preview-chip preview-chip--muted">
+                    {previewRecords.length < records.length
+                      ? `İlk ${previewRecords.length} kaydı görüyorsunuz`
+                      : `${previewRecords.length} kayıt görüntüleniyor`}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="export-actions">
+              <button
+                type="button"
+                onClick={() => downloadJson(records)}
+                disabled={exportDisabled}
+                data-tooltip='[{"id":1,"status":"active"}]'
+                title='[{"id":1,"status":"active"}]'
+              >
+                <span className="export-actions__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path
+                      d="M12 3v12.25"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                    <path
+                      d="M8.5 12.5 12 16l3.5-3.5"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                    <path
+                      d="M6 18.5h12"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </svg>
+                </span>
+                <span className="export-actions__body">
+                  <span className="export-actions__label">JSON indir</span>
+                  <span className="export-actions__description">API testleri için hazır payload</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadCsv(records)}
+                disabled={exportDisabled}
+                data-tooltip="id,name,status"
+                title="id,name,status"
+              >
+                <span className="export-actions__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path
+                      d="M6.5 4A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 17.5 4h-11z"
+                      fill="currentColor"
+                      opacity="0.18"
+                    />
+                    <path
+                      d="M7.5 8h9M7.5 12h9M7.5 16h9"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </svg>
+                </span>
+                <span className="export-actions__body">
+                  <span className="export-actions__label">CSV indir</span>
+                  <span className="export-actions__description">Spreadsheet dostu sütun yapısı</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => downloadSql(records, tableName || 'mock_data')}
+                disabled={exportDisabled}
+                data-tooltip="INSERT INTO mock_data ..."
+                title="INSERT INTO mock_data ..."
+              >
+                <span className="export-actions__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path
+                      d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v11A2.5 2.5 0 0 1 16.5 20h-9A2.5 2.5 0 0 1 5 17.5v-11z"
+                      fill="currentColor"
+                    />
+                    <path
+                      d="M8.5 9h7M8.5 12h4"
+                      stroke="var(--color-button-text)"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                    <path
+                      d="M8.5 15h3"
+                      stroke="var(--color-button-text)"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </svg>
+                </span>
+                <span className="export-actions__body">
+                  <span className="export-actions__label">SQL INSERT indir</span>
+                  <span className="export-actions__description">Veritabanına direkt ekleyin</span>
+                </span>
+              </button>
             </div>
             {records.length === 0 ? (
               <p className="empty">Henüz veri üretilmedi.</p>
@@ -612,6 +955,7 @@ export default function App() {
             )}
           </section>
         </main>
+        </>
       ) : (
         <main className="layout layout--single">
           <section className="panel howto-panel">
