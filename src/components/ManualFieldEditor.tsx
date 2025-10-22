@@ -1,15 +1,17 @@
 import { useMemo } from 'react';
 import type { ManualField } from '../types';
+import type { ManualFieldCopy } from '../i18n';
 
 interface ManualFieldEditorProps {
   field: ManualField;
   onChange: (field: ManualField) => void;
   onRemove: (id: string) => void;
+  copy: ManualFieldCopy;
 }
 
 const numericTypes = new Set(['number', 'integer']);
 
-export default function ManualFieldEditor({ field, onChange, onRemove }: ManualFieldEditorProps) {
+export default function ManualFieldEditor({ field, onChange, onRemove, copy }: ManualFieldEditorProps) {
   const requiresNumericConstraints = useMemo(() => numericTypes.has(field.type), [field.type]);
   const requiresStringConstraints = useMemo(() => field.type === 'string', [field.type]);
 
@@ -20,18 +22,18 @@ export default function ManualFieldEditor({ field, onChange, onRemove }: ManualF
   return (
     <div className="manual-field">
       <div className="manual-field__header">
-        <strong>{field.name || 'Yeni Alan'}</strong>
+        <strong>{field.name || copy.newFieldFallback}</strong>
         <button type="button" onClick={() => onRemove(field.id)}>
-          Sil
+          {copy.remove}
         </button>
       </div>
       <div className="manual-field__grid">
         <label>
-          Alan Adı
+          {copy.fieldName}
           <input value={field.name} onChange={(event) => handleChange('name', event.target.value)} />
         </label>
         <label>
-          Veri Tipi
+          {copy.dataType}
           <select value={field.type} onChange={(event) => handleChange('type', event.target.value)}>
             <option value="string">String</option>
             <option value="number">Number</option>
@@ -46,42 +48,46 @@ export default function ManualFieldEditor({ field, onChange, onRemove }: ManualF
             checked={field.required}
             onChange={(event) => handleChange('required', event.target.checked)}
           />
-          Zorunlu
+          {copy.required}
         </label>
         {requiresStringConstraints && (
           <>
             <label>
-              Min. Uzunluk
+              {copy.minLength}
               <input
                 type="number"
                 min={0}
                 value={field.minLength ?? ''}
-                onChange={(event) => handleChange('minLength', event.target.value ? Number(event.target.value) : undefined)}
+                onChange={(event) =>
+                  handleChange('minLength', event.target.value ? Number(event.target.value) : undefined)
+                }
               />
             </label>
             <label>
-              Max. Uzunluk
+              {copy.maxLength}
               <input
                 type="number"
                 min={0}
                 value={field.maxLength ?? ''}
-                onChange={(event) => handleChange('maxLength', event.target.value ? Number(event.target.value) : undefined)}
+                onChange={(event) =>
+                  handleChange('maxLength', event.target.value ? Number(event.target.value) : undefined)
+                }
               />
             </label>
             <label>
-              Pattern (RegExp)
+              {copy.pattern}
               <input
                 value={field.pattern ?? ''}
                 onChange={(event) => handleChange('pattern', event.target.value || undefined)}
-                placeholder="^[A-Z]{3}$"
+                placeholder={copy.patternPlaceholder}
               />
             </label>
             <label>
-              Enum (virgülle ayrılmış)
+              {copy.enum}
               <input
                 value={field.enumValues ?? ''}
                 onChange={(event) => handleChange('enumValues', event.target.value)}
-                placeholder="A, B, C"
+                placeholder={copy.enumPlaceholder}
               />
             </label>
           </>
@@ -89,19 +95,23 @@ export default function ManualFieldEditor({ field, onChange, onRemove }: ManualF
         {requiresNumericConstraints && (
           <>
             <label>
-              Minimum
+              {copy.minimum}
               <input
                 type="number"
                 value={field.minimum ?? ''}
-                onChange={(event) => handleChange('minimum', event.target.value ? Number(event.target.value) : undefined)}
+                onChange={(event) =>
+                  handleChange('minimum', event.target.value ? Number(event.target.value) : undefined)
+                }
               />
             </label>
             <label>
-              Maksimum
+              {copy.maximum}
               <input
                 type="number"
                 value={field.maximum ?? ''}
-                onChange={(event) => handleChange('maximum', event.target.value ? Number(event.target.value) : undefined)}
+                onChange={(event) =>
+                  handleChange('maximum', event.target.value ? Number(event.target.value) : undefined)
+                }
               />
             </label>
           </>

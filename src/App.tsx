@@ -1,160 +1,120 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { GeneratorMode, ManualField } from './types';
+import type { GeneratorMode, Language, ManualField } from './types';
 import ManualFieldEditor from './components/ManualFieldEditor';
 import { parseCreateTableScript } from './utils/sqlParser';
 import { manualFieldsToSchema } from './utils/manualSchema';
 import { generateRecords } from './utils/generator';
 import { downloadCsv, downloadJson, downloadSql, toJsonString } from './utils/exporters';
 import { inferSchemaFromSample } from './utils/schemaInference';
-import { exampleSnippets, type ExampleSnippet } from './data/examples';
-import { howToSections } from './data/howTo';
+import { getExampleSnippets, type ExampleSnippet } from './data/examples';
+import { getHowToSections } from './data/howTo';
+import { languageOptions, translations } from './i18n';
 
-const modeLabels: Record<GeneratorMode, string> = {
-  jsonSchema: 'JSON Schema',
-  createTable: 'CREATE TABLE',
-  manual: 'Manuel Tanım',
+const modeCardIcons: Record<GeneratorMode, ReactNode> = {
+  jsonSchema: (
+    <svg viewBox="0 0 24 24" focusable="false" role="img" aria-hidden="true">
+      <path
+        d="M6.5 3A2.5 2.5 0 0 0 4 5.5v13A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V8.414a2.5 2.5 0 0 0-.732-1.768l-3.914-3.914A2.5 2.5 0 0 0 13.586 2H6.5z"
+        fill="currentColor"
+      />
+      <path
+        d="M14 2.75v4a1.25 1.25 0 0 0 1.25 1.25h4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path
+        d="M8 14.5h8M8 17.5h5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <rect x="8" y="9.5" width="8" height="2" rx="1" fill="currentColor" opacity="0.65" />
+    </svg>
+  ),
+  createTable: (
+    <svg viewBox="0 0 24 24" focusable="false" role="img" aria-hidden="true">
+      <path
+        d="M5 5.5A2.5 2.5 0 0 1 7.5 3h9A2.5 2.5 0 0 1 19 5.5v13A2.5 2.5 0 0 1 16.5 21h-9A2.5 2.5 0 0 1 5 18.5v-13z"
+        fill="currentColor"
+      />
+      <path
+        d="M8 8h8M8 11.5h8M8 15h5"
+        stroke="var(--color-button-text)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path
+        d="M8.25 18H11"
+        stroke="var(--color-button-text)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  ),
+  manual: (
+    <svg viewBox="0 0 24 24" focusable="false" role="img" aria-hidden="true">
+      <path
+        d="M6.75 4A2.75 2.75 0 0 0 4 6.75v10.5A2.75 2.75 0 0 0 6.75 20H17.5l2.5-2.5V6.75A2.75 2.75 0 0 0 17.25 4h-10.5z"
+        fill="currentColor"
+      />
+      <path
+        d="M9 8.5h6M9 12h6"
+        stroke="var(--color-button-text)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path
+        d="M9 15.5h3.5"
+        stroke="var(--color-button-text)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path d="M17 21v-3l3 3h-3z" fill="var(--color-button-text)" />
+    </svg>
+  ),
 };
 
-const modeCardDetails: Record<
-  GeneratorMode,
-  { title: string; description: string; icon: ReactNode; highlight: string }
-> = {
-  jsonSchema: {
-    title: 'JSON Schema',
-    description: 'Örnekten şema çıkarın, validasyonu geçecek kayıtlar oluşturun.',
-    highlight: 'AJV ile doğrulandı',
-    icon: (
-      <svg viewBox="0 0 24 24" focusable="false" role="img" aria-hidden="true">
-        <path
-          d="M6.5 3A2.5 2.5 0 0 0 4 5.5v13A2.5 2.5 0 0 0 6.5 21h11a2.5 2.5 0 0 0 2.5-2.5V8.414a2.5 2.5 0 0 0-.732-1.768l-3.914-3.914A2.5 2.5 0 0 0 13.586 2H6.5z"
-          fill="currentColor"
-        />
-        <path
-          d="M14 2.75v4a1.25 1.25 0 0 0 1.25 1.25h4"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <path
-          d="M8 14.5h8M8 17.5h5"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <rect
-          x="8"
-          y="9.5"
-          width="8"
-          height="2"
-          rx="1"
-          fill="currentColor"
-          opacity="0.65"
-        />
-      </svg>
-    ),
-  },
-  createTable: {
-    title: 'CREATE TABLE',
-    description: 'SQL tablo tanımlarından kolon tiplerini algılayın, INSERT scriptlerini indirin.',
-    highlight: 'INSERT script hazır',
-    icon: (
-      <svg viewBox="0 0 24 24" focusable="false" role="img" aria-hidden="true">
-        <path
-          d="M5 5.5A2.5 2.5 0 0 1 7.5 3h9A2.5 2.5 0 0 1 19 5.5v13A2.5 2.5 0 0 1 16.5 21h-9A2.5 2.5 0 0 1 5 18.5v-13z"
-          fill="currentColor"
-        />
-        <path
-          d="M8 8h8M8 11.5h8M8 15h5"
-          stroke="var(--color-button-text)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <path
-          d="M8.25 18H11"
-          stroke="var(--color-button-text)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-      </svg>
-    ),
-  },
-  manual: {
-    title: 'Manuel Tanım',
-    description: 'Sıfırdan alanlar ekleyin, JSON Schema çıktısını düzenleyin ve paylaşın.',
-    highlight: 'Anında şema çıktısı',
-    icon: (
-      <svg viewBox="0 0 24 24" focusable="false" role="img" aria-hidden="true">
-        <path
-          d="M6.75 4A2.75 2.75 0 0 0 4 6.75v10.5A2.75 2.75 0 0 0 6.75 20H17.5l2.5-2.5V6.75A2.75 2.75 0 0 0 17.25 4h-10.5z"
-          fill="currentColor"
-        />
-        <path
-          d="M9 8.5h6M9 12h6"
-          stroke="var(--color-button-text)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <path
-          d="M9 15.5h3.5"
-          stroke="var(--color-button-text)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <path
-          d="M17 21v-3l3 3h-3z"
-          fill="var(--color-button-text)"
-        />
-      </svg>
-    ),
-  },
-};
-
-const definitionTabMeta: Record<'definition' | 'examples', { label: string; icon: ReactNode }> = {
-  definition: {
-    label: 'Tanım',
-    icon: (
-      <svg viewBox="0 0 20 20" focusable="false" role="img" aria-hidden="true">
-        <rect x="3.5" y="3.5" width="13" height="13" rx="2.5" fill="currentColor" opacity="0.16" />
-        <path
-          d="M6 7.75h8M6 10h5"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <rect x="6" y="12.25" width="4" height="1.5" rx="0.75" fill="currentColor" />
-      </svg>
-    ),
-  },
-  examples: {
-    label: 'Örnekler',
-    icon: (
-      <svg viewBox="0 0 20 20" focusable="false" role="img" aria-hidden="true">
-        <rect x="3.5" y="3.5" width="13" height="13" rx="2.5" fill="currentColor" opacity="0.16" />
-        <path
-          d="M8.5 7.5 6.5 10l2 2.5M11.5 7.5l2 2.5-2 2.5"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-      </svg>
-    ),
-  },
+const definitionTabIcons: Record<'definition' | 'examples', ReactNode> = {
+  definition: (
+    <svg viewBox="0 0 20 20" focusable="false" role="img" aria-hidden="true">
+      <rect x="3.5" y="3.5" width="13" height="13" rx="2.5" fill="currentColor" opacity="0.16" />
+      <path
+        d="M6 7.75h8M6 10h5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <rect x="6" y="12.25" width="4" height="1.5" rx="0.75" fill="currentColor" />
+    </svg>
+  ),
+  examples: (
+    <svg viewBox="0 0 20 20" focusable="false" role="img" aria-hidden="true">
+      <rect x="3.5" y="3.5" width="13" height="13" rx="2.5" fill="currentColor" opacity="0.16" />
+      <path
+        d="M8.5 7.5 6.5 10l2 2.5M11.5 7.5l2 2.5-2 2.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
+  ),
 };
 
 const definitionTabsOrder: Array<'definition' | 'examples'> = ['definition', 'examples'];
@@ -194,6 +154,13 @@ function getDefaultInput(mode: GeneratorMode): string {
 
 export default function App() {
   const [mode, setMode] = useState<GeneratorMode>('jsonSchema');
+  const [language, setLanguage] = useState<Language>(() => {
+    if (typeof window === 'undefined') {
+      return 'en';
+    }
+    const stored = window.localStorage.getItem('mdg.language');
+    return stored === 'tr' ? 'tr' : 'en';
+  });
   const [activeMainTab, setActiveMainTab] = useState<'generator' | 'howTo'>('generator');
   const [activeDefinitionTab, setActiveDefinitionTab] = useState<'definition' | 'examples'>('definition');
   const [definition, setDefinition] = useState<string>(getDefaultInput('jsonSchema'));
@@ -226,6 +193,8 @@ export default function App() {
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
   });
 
+  const t = translations[language];
+
   useEffect(() => {
     if (typeof document === 'undefined') {
       return;
@@ -246,6 +215,17 @@ export default function App() {
       window.localStorage.setItem('mdg.theme', isDarkMode ? 'dark' : 'light');
     }
   }, [isDarkMode]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('mdg.language', language);
+    }
+  }, [language]);
+
+  useEffect(() => {
+    setSchemaAssistantError(null);
+    setSchemaAssistantMessage(null);
+  }, [language]);
 
   useEffect(
     () => () => {
@@ -311,7 +291,8 @@ export default function App() {
     return JSON.stringify(schema, null, 2);
   }, [manualFields, mode]);
 
-  const currentExamples = useMemo(() => exampleSnippets[mode], [mode]);
+  const currentExamples = useMemo(() => getExampleSnippets(language)[mode], [language, mode]);
+  const howToSections = useMemo(() => getHowToSections(language), [language]);
 
   const closeNav = () => setIsNavOpen(false);
 
@@ -355,7 +336,7 @@ export default function App() {
         const schema = JSON.parse(definition);
         return { schema, errors: [] };
       } catch (error) {
-        return { schema: null, errors: ['JSON Schema parse edilemedi: ' + (error as Error).message] };
+        return { schema: null, errors: [t.schemaParseErrorPrefix + (error as Error).message] };
       }
     }
     if (mode === 'createTable') {
@@ -373,17 +354,17 @@ export default function App() {
     setSchemaAssistantError(null);
     setSchemaAssistantMessage(null);
     if (!sampleJson.trim()) {
-      setSchemaAssistantError('Örnek JSON boş olamaz.');
+      setSchemaAssistantError(t.schemaHelper.emptyError);
       return;
     }
     try {
       const parsed = JSON.parse(sampleJson);
       const inferred = inferSchemaFromSample(parsed);
       setDefinition(JSON.stringify(inferred, null, 2));
-      setSchemaAssistantMessage('Şema örnek JSON\'dan üretildi.');
+      setSchemaAssistantMessage(t.schemaHelper.success);
       setActiveDefinitionTab('definition');
     } catch (error) {
-      setSchemaAssistantError('Örnek JSON parse edilemedi: ' + (error as Error).message);
+      setSchemaAssistantError(t.schemaHelper.parseErrorPrefix + (error as Error).message);
     }
   };
 
@@ -407,7 +388,7 @@ export default function App() {
       }
       copyResetTimeout.current = setTimeout(() => setCopiedExample(null), 2000);
     } catch (error) {
-      console.error('Kopyalama başarısız oldu', error);
+      console.error('Copy failed', error);
     }
   };
 
@@ -453,74 +434,99 @@ export default function App() {
   return (
     <div className="app">
       <header className="app__header">
-        <div className="app__brand">
-          <div className="brand-mark" aria-hidden="true">
-            MD
-          </div>
-          <div className="brand-copy">
-            <h1>Mock Data Generator</h1>
-            <p>JSON Schema, SQL veya manuel tanımlardan hızlıca sahte veri üretin.</p>
-          </div>
+      <div className="app__brand">
+        <div className="brand-mark" aria-hidden="true">
+          MD
         </div>
-        <button
-          type="button"
-          className={`menu-toggle ${isNavOpen ? 'is-active' : ''}`}
-          onClick={() => setIsNavOpen((previous) => !previous)}
-          aria-label={isNavOpen ? 'Navigasyonu kapat' : 'Navigasyonu aç'}
-          aria-expanded={isNavOpen}
-          aria-controls="app-navigation"
-        >
-          <span className="menu-icon" />
-        </button>
-        <nav id="app-navigation" className={`app__nav ${isNavOpen ? 'is-open' : ''}`}>
-          <div className="nav-inner">
-            <div className="nav-section">
-              <span className="nav-label">Görünüm</span>
-              <div className="view-tabs">
-                <button
-                  type="button"
-                  className={activeMainTab === 'generator' ? 'active' : ''}
-                  onClick={() => handleMainTabChange('generator')}
-                >
-                  Veri Üretici
-                </button>
-                <button
-                  type="button"
-                  className={activeMainTab === 'howTo' ? 'active' : ''}
-                  onClick={() => handleMainTabChange('howTo')}
-                >
-                  Nasıl Kullanılır?
-                </button>
-              </div>
-            </div>
-            <div className="nav-section">
-              <span className="nav-label">Mod</span>
-              <div className="mode-selector">
-                {(Object.keys(modeLabels) as GeneratorMode[]).map((key) => (
-                  <button
-                    key={key}
-                    className={key === mode ? 'active' : ''}
-                    type="button"
-                    onClick={() => handleModeChange(key)}
-                  >
-                    {modeLabels[key]}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="nav-footer">
+        <div className="brand-copy">
+          <h1>Mock Data Generator</h1>
+          <p>{t.brandTagline}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        className={`menu-toggle ${isNavOpen ? 'is-active' : ''}`}
+        onClick={() => setIsNavOpen((previous) => !previous)}
+        aria-label={isNavOpen ? t.menuToggle.close : t.menuToggle.open}
+        aria-expanded={isNavOpen}
+        aria-controls="app-navigation"
+      >
+        <span className="menu-icon" />
+      </button>
+      <nav id="app-navigation" className={`app__nav ${isNavOpen ? 'is-open' : ''}`}>
+        <div className="nav-inner">
+          <div className="nav-section">
+            <span className="nav-label">{t.nav.viewLabel}</span>
+            <div className="view-tabs">
               <button
                 type="button"
-                className={`theme-toggle ${isDarkMode ? 'is-dark' : ''}`}
-                onClick={() => setIsDarkMode((previous) => !previous)}
-                aria-pressed={isDarkMode}
-                aria-label={isDarkMode ? 'Aydınlık temaya geç' : 'Karanlık temaya geç'}
-                title={isDarkMode ? 'Aydınlık temaya geç' : 'Karanlık temaya geç'}
+                className={activeMainTab === 'generator' ? 'active' : ''}
+                onClick={() => handleMainTabChange('generator')}
               >
-                <span className="theme-toggle__icon" aria-hidden="true">
-                  {isDarkMode ? (
-                    <svg viewBox="0 0 24 24">
-                      <path
+                {t.nav.viewTabs.generator}
+              </button>
+              <button
+                type="button"
+                className={activeMainTab === 'howTo' ? 'active' : ''}
+                onClick={() => handleMainTabChange('howTo')}
+              >
+                {t.nav.viewTabs.howTo}
+              </button>
+            </div>
+          </div>
+          <div className="nav-section">
+            <span className="nav-label">{t.nav.modeLabel}</span>
+            <div className="mode-selector">
+              {(Object.keys(t.modeNames) as GeneratorMode[]).map((key) => (
+                <button
+                  key={key}
+                  className={key === mode ? 'active' : ''}
+                  type="button"
+                  onClick={() => handleModeChange(key)}
+                >
+                  {t.modeNames[key]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="nav-section nav-section--language">
+            <span className="nav-label">{t.nav.languageLabel}</span>
+            <div className="language-switcher">
+              {languageOptions.map((option) => {
+                const isActive = option.value === language;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={isActive ? 'active' : ''}
+                    onClick={() => {
+                      if (!isActive) {
+                        setLanguage(option.value);
+                      }
+                    }}
+                    aria-pressed={isActive}
+                    aria-label={option.fullLabel}
+                    title={option.fullLabel}
+                  >
+                    {option.shortLabel}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="nav-footer">
+            <button
+              type="button"
+              className={`theme-toggle ${isDarkMode ? 'is-dark' : ''}`}
+              onClick={() => setIsDarkMode((previous) => !previous)}
+              aria-pressed={isDarkMode}
+              aria-label={isDarkMode ? t.themeToggle.toLightAria : t.themeToggle.toDarkAria}
+              title={isDarkMode ? t.themeToggle.toLightAria : t.themeToggle.toDarkAria}
+            >
+              <span className="theme-toggle__icon" aria-hidden="true">
+                {isDarkMode ? (
+                  <svg viewBox="0 0 24 24">
+                    <path
                         d="M15.25 4.5a.75.75 0 0 0-.71 1 6.5 6.5 0 1 1-8.04 8.04.75.75 0 0 0-1 .71 8 8 0 1 0 9.75-9.75z"
                         fill="currentColor"
                       />
@@ -539,9 +545,9 @@ export default function App() {
                 </span>
                 <span className="theme-toggle__copy">
                   <span className="theme-toggle__label">
-                    {isDarkMode ? 'Karanlık tema aktif' : 'Aydınlık tema aktif'}
+                    {isDarkMode ? t.themeToggle.darkActive : t.themeToggle.lightActive}
                   </span>
-                  <span className="theme-toggle__caption">Geçiş yap</span>
+                  <span className="theme-toggle__caption">{t.themeToggle.caption}</span>
                 </span>
               </button>
             </div>
@@ -554,34 +560,31 @@ export default function App() {
         <>
           <section className="hero">
             <div className="hero__content">
-              <h2>Test verinizi dakikalar içinde hazırlayın</h2>
-              <p>
-                Mock Data Generator, şemanızı doğrularken farklı formatlarda mock veri oluşturur. Edge case’leri deneyin,
-                çıktıyı indirin ve ekibinizle paylaşın.
-              </p>
+              <h2>{t.hero.title}</h2>
+              <p>{t.hero.description}</p>
               <div className="hero__actions">
                 <button
                   type="button"
                   className="hero__cta"
                   onClick={() => definitionPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                 >
-                  Veri üretmeye başla
+                  {t.hero.ctaPrimary}
                 </button>
                 <button type="button" className="hero__secondary" onClick={() => handleMainTabChange('howTo')}>
-                  Nasıl çalışır?
+                  {t.hero.ctaSecondary}
                 </button>
               </div>
               <ul className="hero__highlights">
-                <li>JSON, CSV ve SQL formatlarında dışa aktarma</li>
-                <li>Edge case ve validasyon uyarılarıyla güvenilir veri</li>
-                <li>Tamamı tarayıcıda, verileriniz güvende</li>
+                {t.hero.highlights.map((highlight) => (
+                  <li key={highlight}>{highlight}</li>
+                ))}
               </ul>
             </div>
             <div className="hero__modes">
-              <span className="hero__modes-label">Üretim modu</span>
+              <span className="hero__modes-label">{t.hero.modeLabel}</span>
               <div className="mode-cards">
-                {(Object.keys(modeCardDetails) as GeneratorMode[]).map((key) => {
-                  const details = modeCardDetails[key];
+                {(Object.keys(t.modeNames) as GeneratorMode[]).map((key) => {
+                  const copy = t.modeCards[key];
                   const isActive = mode === key;
                   return (
                     <button
@@ -590,19 +593,19 @@ export default function App() {
                       className={`mode-card ${isActive ? 'is-active' : ''}`}
                       onClick={() => handleModeChange(key)}
                       aria-pressed={isActive}
-                      aria-label={`${details.title}: ${details.description}`}
+                      aria-label={`${t.modeNames[key]}: ${copy.description}`}
                     >
                       <span className="mode-card__icon" aria-hidden="true">
-                        {details.icon}
+                        {modeCardIcons[key]}
                       </span>
                       <div className="mode-card__body">
                         <div className="mode-card__meta">
-                          <span className="mode-card__highlight">{details.highlight}</span>
-                          <h3>{details.title}</h3>
+                          <span className="mode-card__highlight">{copy.highlight}</span>
+                          <h3>{t.modeNames[key]}</h3>
                         </div>
-                        <p>{details.description}</p>
+                        <p>{copy.description}</p>
                       </div>
-                      {isActive && <span className="mode-card__status">Seçili</span>}
+                      {isActive && <span className="mode-card__status">{t.modeSelectedLabel}</span>}
                     </button>
                   );
                 })}
@@ -612,196 +615,193 @@ export default function App() {
           <main className="layout">
             <section className="panel panel--definition" ref={definitionPanelRef}>
               <div className="panel__header">
-              <h2>Yapı Tanımı</h2>
-              <div className="panel__actions">
-                <label>
-                  Kayıt sayısı
-                  <input
-                    type="number"
-                    min={1}
-                    max={1000}
-                    value={recordCount}
-                    onChange={(event) => setRecordCount(Math.min(1000, Math.max(1, Number(event.target.value))))}
-                  />
-                </label>
-                <div className="edge-slider">
-                  <span>Edge case oranı</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={50}
-                    step={5}
-                    value={edgeCaseRatio}
-                    onChange={(event) => setEdgeCaseRatio(Number(event.target.value))}
-                    aria-label="Edge case oranı"
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    max={50}
-                    value={edgeCaseRatio}
-                    onChange={(event) =>
-                      setEdgeCaseRatio(Math.min(50, Math.max(0, Number(event.target.value) || 0)))
-                    }
-                    aria-label="Edge case oranı yüzde"
-                  />
-                  <span className="edge-slider__value">%{edgeCaseRatio}</span>
-                </div>
-                <button type="button" onClick={handleGenerate} disabled={isGenerating}>
-                  {isGenerating ? 'Üretiliyor…' : 'Veri Üret'}
-                </button>
-              </div>
-            </div>
-
-            <details className="edge-info">
-              <summary>Edge case açıklaması</summary>
-              <p>
-                Edge case kayıtları, sınır değerlerin ve beklenmeyen kombinasyonların test edilmesine yardımcı olur. Veri
-                kümesinin %{edgeCaseRatio} kadarı uç örneklerden oluşur.
-              </p>
-              <ul>
-                <li>Minimum veya maksimum kısıtlarının dışına çıkan değerler</li>
-                <li>Pattern veya enum tanımlarına uymayan string içerikleri</li>
-                <li>Zorunlu olmayan alanların boş bırakıldığı veya NULL döndüğü senaryolar</li>
-              </ul>
-            </details>
-
-            <div className="definition-tabs">
-              {definitionTabsOrder.map((tabKey) => {
-                const tab = definitionTabMeta[tabKey];
-                const isActive = activeDefinitionTab === tabKey;
-                return (
-                  <button
-                    key={tabKey}
-                    type="button"
-                    className={isActive ? 'active' : ''}
-                    onClick={() => setActiveDefinitionTab(tabKey)}
-                  >
-                    <span className="tab-icon" aria-hidden="true">
-                      {tab.icon}
-                    </span>
-                    <span className="tab-label">{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {activeDefinitionTab === 'definition' ? (
-              mode !== 'manual' ? (
-                <>
-                  <textarea
-                    value={definition}
-                    onChange={(event) => setDefinition(event.target.value)}
-                    spellCheck={false}
-                    className="schema-input"
-                    rows={18}
-                  />
-                  {mode === 'jsonSchema' && (
-                    <div className="schema-helper">
-                      <div>
-                        <h3>AI Destekli Şema Çıkarma</h3>
-                        <p>Örnek JSON verisini yapıştırın, şema otomatik çıkarılsın.</p>
-                      </div>
-                      <textarea
-                        value={sampleJson}
-                        onChange={(event) => {
-                          setSampleJson(event.target.value);
-                          setSchemaAssistantError(null);
-                          setSchemaAssistantMessage(null);
-                        }}
-                        spellCheck={false}
-                        className="schema-helper__input"
-                        rows={8}
-                        placeholder='[{"id":1,"name":"Ada","email":"ada@example.com"}]'
-                      />
-                      <div className="schema-helper__actions">
-                        <button
-                          type="button"
-                          onClick={handleSchemaInference}
-                          disabled={isGenerating || !sampleJson.trim()}
-                        >
-                          Örnekten Şema Üret
-                        </button>
-                        {schemaAssistantMessage && (
-                          <span className="schema-helper__status schema-helper__status--success">
-                            {schemaAssistantMessage}
-                          </span>
-                        )}
-                        {schemaAssistantError && (
-                          <span className="schema-helper__status schema-helper__status--error">
-                            {schemaAssistantError}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="manual-editor">
-                  {manualFields.map((field) => (
-                    <ManualFieldEditor
-                      key={field.id}
-                      field={field}
-                      onChange={handleManualFieldChange}
-                      onRemove={handleManualFieldRemove}
+                <h2>{t.definitionPanel.title}</h2>
+                <div className="panel__actions">
+                  <label>
+                    {t.definitionPanel.recordCountLabel}
+                    <input
+                      type="number"
+                      min={1}
+                      max={1000}
+                      value={recordCount}
+                      onChange={(event) => setRecordCount(Math.min(1000, Math.max(1, Number(event.target.value))))}
                     />
-                  ))}
-                  <button type="button" className="add-field" onClick={addManualField}>
-                    Alan Ekle
-                  </button>
-                  <div className="manual-preview">
-                    <h3>Oluşan JSON Schema</h3>
-                    <pre>{manualSchemaPreview}</pre>
+                  </label>
+                  <div className="edge-slider">
+                    <span>{t.definitionPanel.edgeCaseLabel}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={50}
+                      step={5}
+                      value={edgeCaseRatio}
+                      onChange={(event) => setEdgeCaseRatio(Number(event.target.value))}
+                      aria-label={t.definitionPanel.edgeCaseSliderAria}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={50}
+                      value={edgeCaseRatio}
+                      onChange={(event) =>
+                        setEdgeCaseRatio(Math.min(50, Math.max(0, Number(event.target.value) || 0)))
+                      }
+                      aria-label={t.definitionPanel.edgeCaseNumberAria}
+                    />
+                    <span className="edge-slider__value">%{edgeCaseRatio}</span>
                   </div>
+                  <button type="button" onClick={handleGenerate} disabled={isGenerating}>
+                    {isGenerating ? t.definitionPanel.generateBusy : t.definitionPanel.generateIdle}
+                  </button>
                 </div>
-              )
-            ) : (
-              <div className="examples-list">
-                {currentExamples.map((example) => (
-                  <article key={example.id} className="example-card">
-                    <header>
-                      <div>
-                        <h3>{example.title}</h3>
-                        {example.description && <p>{example.description}</p>}
-                      </div>
-                      <button type="button" onClick={() => handleExampleCopy(example)}>
-                        {copiedExample === example.id ? 'Kopyalandı!' : 'Kopyala'}
-                      </button>
-                    </header>
-                    <pre className={`code-block code-block--${example.language}`}>
-                      {example.content}
-                    </pre>
-                  </article>
-                ))}
-                {currentExamples.length === 0 && <p className="empty">Bu mod için henüz örnek eklenmedi.</p>}
               </div>
-            )}
 
-            {schemaErrors.length > 0 && (
-              <div className="error-box">
-                <h3>Tanım Hataları</h3>
+              <details className="edge-info">
+                <summary>{t.definitionPanel.edgeSummary}</summary>
+                <p>{t.definitionPanel.edgeDescription(edgeCaseRatio)}</p>
                 <ul>
-                  {schemaErrors.map((error) => (
-                    <li key={error}>{error}</li>
+                  {t.definitionPanel.edgeBullets.map((item) => (
+                    <li key={item}>{item}</li>
                   ))}
                 </ul>
+              </details>
+
+              <div className="definition-tabs">
+                {definitionTabsOrder.map((tabKey) => {
+                  const isActive = activeDefinitionTab === tabKey;
+                  return (
+                    <button
+                      key={tabKey}
+                      type="button"
+                      className={isActive ? 'active' : ''}
+                      onClick={() => setActiveDefinitionTab(tabKey)}
+                    >
+                      <span className="tab-icon" aria-hidden="true">
+                        {definitionTabIcons[tabKey]}
+                      </span>
+                      <span className="tab-label">{t.definitionTabs[tabKey]}</span>
+                    </button>
+                  );
+                })}
               </div>
-            )}
-          </section>
+
+              {activeDefinitionTab === 'definition' ? (
+                mode !== 'manual' ? (
+                  <>
+                    <textarea
+                      value={definition}
+                      onChange={(event) => setDefinition(event.target.value)}
+                      spellCheck={false}
+                      className="schema-input"
+                      rows={18}
+                    />
+                    {mode === 'jsonSchema' && (
+                      <div className="schema-helper">
+                        <div>
+                          <h3>{t.schemaHelper.title}</h3>
+                          <p>{t.schemaHelper.description}</p>
+                        </div>
+                        <textarea
+                          value={sampleJson}
+                          onChange={(event) => {
+                            setSampleJson(event.target.value);
+                            setSchemaAssistantError(null);
+                            setSchemaAssistantMessage(null);
+                          }}
+                          spellCheck={false}
+                          className="schema-helper__input"
+                          rows={8}
+                          placeholder={t.schemaHelper.placeholder}
+                        />
+                        <div className="schema-helper__actions">
+                          <button
+                            type="button"
+                            onClick={handleSchemaInference}
+                            disabled={isGenerating || !sampleJson.trim()}
+                          >
+                            {t.schemaHelper.action}
+                          </button>
+                          {schemaAssistantMessage && (
+                            <span className="schema-helper__status schema-helper__status--success">
+                              {schemaAssistantMessage}
+                            </span>
+                          )}
+                          {schemaAssistantError && (
+                            <span className="schema-helper__status schema-helper__status--error">
+                              {schemaAssistantError}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="manual-editor">
+                    {manualFields.map((field) => (
+                      <ManualFieldEditor
+                        key={field.id}
+                        field={field}
+                        onChange={handleManualFieldChange}
+                        onRemove={handleManualFieldRemove}
+                        copy={t.manualEditor}
+                      />
+                    ))}
+                    <button type="button" className="add-field" onClick={addManualField}>
+                      {t.manualEditor.addField}
+                    </button>
+                    <div className="manual-preview">
+                      <h3>{t.manualEditor.previewTitle}</h3>
+                      <pre>{manualSchemaPreview}</pre>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="examples-list">
+                  {currentExamples.map((example) => (
+                    <article key={example.id} className="example-card">
+                      <header>
+                        <div>
+                          <h3>{example.title}</h3>
+                          {example.description && <p>{example.description}</p>}
+                        </div>
+                        <button type="button" onClick={() => handleExampleCopy(example)}>
+                          {copiedExample === example.id ? t.examples.copied : t.examples.copy}
+                        </button>
+                      </header>
+                      <pre className={`code-block code-block--${example.language}`}>
+                        {example.content}
+                      </pre>
+                    </article>
+                  ))}
+                  {currentExamples.length === 0 && <p className="empty">{t.examples.empty}</p>}
+                </div>
+              )}
+
+              {schemaErrors.length > 0 && (
+                <div className="error-box">
+                  <h3>{t.schemaErrorsTitle}</h3>
+                  <ul>
+                    {schemaErrors.map((error) => (
+                      <li key={error}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </section>
 
           <section className="panel panel--preview">
             <div className="panel__header panel__header--stack">
               <div className="panel__title">
-                <h2>Önizleme & Dışa Aktarım</h2>
-                <p className="panel__subtitle">Formatı seçin, tek tuşla paylaşın.</p>
+                <h2>{t.previewPanel.title}</h2>
+                <p className="panel__subtitle">{t.previewPanel.subtitle}</p>
               </div>
               {records.length > 0 && (
                 <div className="preview-meta">
-                  <span className="preview-chip">{records.length} kayıt</span>
+                  <span className="preview-chip">{t.previewPanel.recordChip(records.length)}</span>
                   <span className="preview-chip preview-chip--muted">
                     {previewRecords.length < records.length
-                      ? `İlk ${previewRecords.length} kaydı görüyorsunuz`
-                      : `${previewRecords.length} kayıt görüntüleniyor`}
+                      ? t.previewPanel.limitedChip(previewRecords.length, records.length)
+                      : t.previewPanel.allChip(previewRecords.length)}
                   </span>
                 </div>
               )}
@@ -811,8 +811,8 @@ export default function App() {
                 type="button"
                 onClick={() => downloadJson(records)}
                 disabled={exportDisabled}
-                data-tooltip='[{"id":1,"status":"active"}]'
-                title='[{"id":1,"status":"active"}]'
+                data-tooltip={t.exportButtons.json.tooltip}
+                title={t.exportButtons.json.tooltip}
               >
                 <span className="export-actions__icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
@@ -843,16 +843,16 @@ export default function App() {
                   </svg>
                 </span>
                 <span className="export-actions__body">
-                  <span className="export-actions__label">JSON indir</span>
-                  <span className="export-actions__description">API testleri için hazır payload</span>
+                  <span className="export-actions__label">{t.exportButtons.json.label}</span>
+                  <span className="export-actions__description">{t.exportButtons.json.description}</span>
                 </span>
               </button>
               <button
                 type="button"
                 onClick={() => downloadCsv(records)}
                 disabled={exportDisabled}
-                data-tooltip="id,name,status"
-                title="id,name,status"
+                data-tooltip={t.exportButtons.csv.tooltip}
+                title={t.exportButtons.csv.tooltip}
               >
                 <span className="export-actions__icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
@@ -872,16 +872,16 @@ export default function App() {
                   </svg>
                 </span>
                 <span className="export-actions__body">
-                  <span className="export-actions__label">CSV indir</span>
-                  <span className="export-actions__description">Spreadsheet dostu sütun yapısı</span>
+                  <span className="export-actions__label">{t.exportButtons.csv.label}</span>
+                  <span className="export-actions__description">{t.exportButtons.csv.description}</span>
                 </span>
               </button>
               <button
                 type="button"
                 onClick={() => downloadSql(records, tableName || 'mock_data')}
                 disabled={exportDisabled}
-                data-tooltip="INSERT INTO mock_data ..."
-                title="INSERT INTO mock_data ..."
+                data-tooltip={t.exportButtons.sql.tooltip}
+                title={t.exportButtons.sql.tooltip}
               >
                 <span className="export-actions__icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
@@ -908,13 +908,13 @@ export default function App() {
                   </svg>
                 </span>
                 <span className="export-actions__body">
-                  <span className="export-actions__label">SQL INSERT indir</span>
-                  <span className="export-actions__description">Veritabanına direkt ekleyin</span>
+                  <span className="export-actions__label">{t.exportButtons.sql.label}</span>
+                  <span className="export-actions__description">{t.exportButtons.sql.description}</span>
                 </span>
               </button>
             </div>
             {records.length === 0 ? (
-              <p className="empty">Henüz veri üretilmedi.</p>
+              <p className="empty">{t.previewPanel.empty}</p>
             ) : (
               <>
                 <div className="table-wrapper">
@@ -938,14 +938,14 @@ export default function App() {
                   </table>
                 </div>
                 <details>
-                  <summary>JSON Önizlemesi</summary>
+                  <summary>{t.previewPanel.jsonSummary}</summary>
                   <pre className="json-preview">{jsonPreview}</pre>
                 </details>
               </>
             )}
             {validationErrors.length > 0 && (
               <div className="warning-box">
-                <h3>Validasyon Uyarıları</h3>
+                <h3>{t.validationTitle}</h3>
                 <ul>
                   {validationErrors.map((error, index) => (
                     <li key={`${error}-${index}`}>{error}</li>
@@ -959,7 +959,7 @@ export default function App() {
       ) : (
         <main className="layout layout--single">
           <section className="panel howto-panel">
-            <h2>Uygulama Nasıl Kullanılır?</h2>
+            <h2>{t.howToTitle}</h2>
             {howToSections.map((section) => (
               <article key={section.title} className="howto-section">
                 <h3>{section.title}</h3>

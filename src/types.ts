@@ -1,4 +1,5 @@
 export type GeneratorMode = 'jsonSchema' | 'createTable' | 'manual';
+export type Language = 'en' | 'tr';
 
 export interface ManualField {
   id: string;
