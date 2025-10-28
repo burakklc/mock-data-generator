@@ -156,6 +156,7 @@ button,
 input,
 select,
 textarea,
+.lined-textarea,
 .app__header,
 .panel,
 .definition-tabs button,
@@ -915,14 +916,74 @@ textarea:focus {
 
 .schema-input {
   width: 100%;
-  border-radius: 1rem;
-  border: 1px solid transparent;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   padding: 1.1rem 1.25rem;
-  background: var(--color-field-bg-muted);
   color: var(--color-text);
   resize: vertical;
   min-height: 420px;
+  box-shadow: none;
+}
+
+.schema-input-wrapper {
+  width: 100%;
+  border-radius: 1rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.lined-textarea {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid var(--color-field-border);
+  background: var(--color-field-bg-muted);
+  overflow: hidden;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.lined-textarea:focus-within {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35), 0 8px 22px -16px rgba(37, 99, 235, 0.45);
+}
+
+.lined-textarea textarea {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 1.1rem 1.25rem;
+  margin: 0;
+  resize: inherit;
+  width: 100%;
+  color: inherit;
+  box-shadow: none;
+  line-height: 1.6;
+}
+
+.lined-textarea textarea:focus {
+  box-shadow: none;
+}
+
+.lined-textarea__gutter {
+  padding: 1.1rem 0.75rem;
+  border-right: 1px solid var(--color-field-border);
+  background: var(--color-field-bg);
+  color: var(--color-muted);
+  text-align: right;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  font-family: 'Fira Code', 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  user-select: none;
+  pointer-events: none;
+  min-width: 3.2rem;
+  overflow: hidden;
+}
+
+.lined-textarea__gutter span + span {
+  margin-top: 0;
 }
 
 .definition-tabs {

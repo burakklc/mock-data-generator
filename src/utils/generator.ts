@@ -35,9 +35,19 @@ async function getJsonSchemaFaker(): Promise<JsonSchemaFaker> {
   return jsfPromise;
 }
 
+export interface ValidationIssue {
+  instancePath: string;
+  displayPath: string;
+  keyword: string;
+  message: string;
+  suggestion: string | null;
+  schemaPath: string;
+  recordNumber: number;
+}
+
 export interface GenerationOutcome {
   records: any[];
-  validationErrors: string[];
+  validationErrors: ValidationIssue[];
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -61,6 +71,28 @@ function getKeyTokens(key: string): string[] {
     .toLowerCase()
     .split('_')
     .filter(Boolean);
+}
+
+function decodeJsonPointerSegment(segment: string): string {
+  return segment.replace(/~1/g, '/').replace(/~0/g, '~');
+}
+
+function formatInstancePath(instancePath: string): string {
+  if (!instancePath) {
+    return 'kök';
+  }
+  const segments = instancePath.split('/').slice(1).map(decodeJsonPointerSegment);
+  let formatted = '';
+  segments.forEach((segment) => {
+    if (/^\d+$/.test(segment)) {
+      formatted += `[${segment}]`;
+    } else if (formatted.length === 0) {
+      formatted = segment;
+    } else {
+      formatted += `.${segment}`;
+    }
+  });
+  return formatted || 'kök';
 }
 
 function randomNumberInRange(
@@ -180,6 +212,126 @@ function ensureNumberInRange(
   const effectiveMin = min ?? (max != null ? max - 10 : 0);
   const effectiveMax = max ?? (min != null ? min + 10 : 1);
   return randomNumberInRange(effectiveMin, effectiveMax, preferInteger, options.decimals);
+}
+
+function buildSuggestion(error: ErrorObject): string | null {
+  const params = (error.params || {}) as Record<string, unknown>;
+  const parentSchema = (error as any).parentSchema || {};
+
+  switch (error.keyword) {
+    case 'required': {
+      const missing = params.missingProperty as string | undefined;
+      return missing
+        ? `"${missing}" alanını ekleyin ve şemadaki gereksinimleri karşılayacak şekilde doldurun.`
+        : 'Eksik alanı ekleyin ve gerekli bilgileri sağlayın.';
+    }
+    case 'type': {
+      const expected = params.type as string | undefined;
+      return expected
+        ? `Değeri ${expected} tipine dönüştürün veya şemada izin verilen tipe göre güncelleyin.`
+        : 'Değeri beklenen tipe uygun hale getirin.';
+    }
+    case 'minLength': {
+      const limit = params.limit as number | undefined;
+      return limit != null
+        ? `En az ${limit} karakter olacak şekilde değeri uzatın.`
+        : 'Değerin uzunluğunu artırın.';
+    }
+    case 'maxLength': {
+      const limit = params.limit as number | undefined;
+      return limit != null
+        ? `Değeri ${limit} karakteri geçmeyecek şekilde kısaltın.`
+        : 'Değerin uzunluğunu kısaltın.';
+    }
+    case 'pattern': {
+      const pattern = parentSchema?.pattern;
+      return pattern
+        ? `Değeri '${pattern}' desenine uyacak biçimde güncelleyin.`
+        : 'Değerin beklenen formata uygun olduğundan emin olun.';
+    }
+    case 'format': {
+      const format = params.format as string | undefined;
+      return format
+        ? `Değeri geçerli bir ${format} formatına dönüştürün.`
+        : 'Değeri şemada beklenen formata uygun hale getirin.';
+    }
+    case 'minimum':
+    case 'exclusiveMinimum': {
+      const limit = params.limit as number | undefined;
+      return limit != null
+        ? `Değeri ${error.keyword === 'exclusiveMinimum' ? '>' : '>='} ${limit} olacak şekilde artırın.`
+        : 'Değerin alt sınırı karşılandığından emin olun.';
+    }
+    case 'maximum':
+    case 'exclusiveMaximum': {
+      const limit = params.limit as number | undefined;
+      return limit != null
+        ? `Değeri ${error.keyword === 'exclusiveMaximum' ? '<' : '<='} ${limit} olacak şekilde azaltın.`
+        : 'Değerin üst sınırı karşılandığından emin olun.';
+    }
+    case 'multipleOf': {
+      const factor = params.multipleOf as number | undefined;
+      return factor != null
+        ? `Değeri ${factor} katsayısının katı olacak şekilde ayarlayın.`
+        : 'Değeri belirtilen çarpanla uyumlu hale getirin.';
+    }
+    case 'minItems': {
+      const limit = params.limit as number | undefined;
+      return limit != null
+        ? `Diziye en az ${limit} öğe ekleyin.`
+        : 'Dizi eleman sayısını artırın.';
+    }
+    case 'maxItems': {
+      const limit = params.limit as number | undefined;
+      return limit != null
+        ? `Dizi eleman sayısını ${limit} değerini aşmayacak şekilde azaltın.`
+        : 'Dizi eleman sayısını azaltın.';
+    }
+    case 'uniqueItems':
+      return 'Dizi içindeki tekrar eden değerleri kaldırarak benzersiz hale getirin.';
+    case 'minProperties': {
+      const limit = params.limit as number | undefined;
+      return limit != null
+        ? `Objeye en az ${limit} adet alan ekleyin.`
+        : 'Objeye gerekli alanları ekleyin.';
+    }
+    case 'maxProperties': {
+      const limit = params.limit as number | undefined;
+      return limit != null
+        ? `Objedeki alan sayısını ${limit} değerini aşmayacak şekilde azaltın.`
+        : 'Objedeki gereksiz alanları kaldırın.';
+    }
+    case 'additionalProperties': {
+      const property = params.additionalProperty as string | undefined;
+      return property
+        ? `"${property}" alanını kaldırın veya şemada izin verilen alanlar listesine ekleyin.`
+        : 'Şemanın tanımlamadığı alanları kaldırın.';
+    }
+    case 'const': {
+      const allowed = params.allowedValue;
+      return allowed !== undefined
+        ? `Değeri ${JSON.stringify(allowed)} olarak ayarlayın.`
+        : 'Değeri şemadaki sabit değere eşitleyin.';
+    }
+    case 'enum': {
+      const allowed = parentSchema?.enum as unknown[] | undefined;
+      return allowed && allowed.length
+        ? `Değeri izin verilen seçeneklerden biriyle değiştirin: ${allowed
+            .slice(0, 5)
+            .map((value) => JSON.stringify(value))
+            .join(', ')}${allowed.length > 5 ? ', ...' : ''}.`
+        : 'Değeri şemada belirtilen seçeneklerden biriyle değiştirin.';
+    }
+    case 'dependentRequired': {
+      const deps = params.deps as string | undefined;
+      const property = params.property as string | undefined;
+      return property && deps
+        ? `"${property}" alanı kullanılıyorsa "${deps}" alanını da ekleyin.`
+        : 'Bağımlı alanların birlikte tanımlandığından emin olun.';
+    }
+    default:
+      return 'Değeri şema kurallarına uygun hale getirin.';
+  }
 }
 
 function adjustValueForSemanticHint(
@@ -536,10 +688,22 @@ function createEdgeCaseRecord(schema: any): Record<string, unknown> {
   return record;
 }
 
-function formatAjvError(error: ErrorObject): string {
-  const path = error.instancePath || error.schemaPath;
-  const message = error.message || 'geçersiz değer';
-  return `${path} ${message}`;
+function formatAjvError(error: ErrorObject, recordIndex: number): ValidationIssue {
+  const instancePath = error.instancePath || '';
+  const displayPath = formatInstancePath(instancePath);
+  const rawMessage = error.message || 'geçersiz değer';
+  const schemaPath = error.schemaPath || '';
+  const message = displayPath === 'kök' ? rawMessage : `${displayPath}: ${rawMessage}`;
+  const suggestion = buildSuggestion(error);
+  return {
+    instancePath,
+    displayPath,
+    keyword: error.keyword,
+    message,
+    suggestion,
+    schemaPath,
+    recordNumber: recordIndex + 1,
+  };
 }
 
 export async function generateRecords(
@@ -585,12 +749,12 @@ export async function generateRecords(
   }
 
   const validator = ajv.compile(schema);
-  const validationErrors: string[] = [];
+  const validationErrors: ValidationIssue[] = [];
   records.forEach((record, index) => {
     const valid = validator(record);
     if (!valid && validator.errors) {
       validator.errors.forEach((error) => {
-        validationErrors.push(`Satır ${index + 1}: ${formatAjvError(error)}`);
+        validationErrors.push(formatAjvError(error, index));
       });
     }
   });

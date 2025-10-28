@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { parse as parseWithPointers } from 'json-source-map';
 import type { GeneratorMode, Language, ManualField } from './types';
 import ManualFieldEditor from './components/ManualFieldEditor';
+import LinedTextArea from './components/LinedTextArea';
 import { parseCreateTableScript } from './utils/sqlParser';
 import { manualFieldsToSchema } from './utils/manualSchema';
-import { generateRecords } from './utils/generator';
+import { generateRecords, type ValidationIssue } from './utils/generator';
 import { downloadCsv, downloadJson, downloadSql, toJsonString } from './utils/exporters';
 import { inferSchemaFromSample } from './utils/schemaInference';
 import { getExampleSnippets, type ExampleSnippet } from './data/examples';
 import { getHowToSections } from './data/howTo';
 import { languageOptions, translations } from './i18n';
+
+type ValidationIssueWithLocation = ValidationIssue & { line?: number; column?: number };
 
 const modeCardIcons: Record<GeneratorMode, ReactNode> = {
   jsonSchema: (
@@ -171,7 +175,8 @@ export default function App() {
   const [tableName, setTableName] = useState<string>('mock_data');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [schemaErrors, setSchemaErrors] = useState<string[]>([]);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationErrors, setValidationErrors] = useState<ValidationIssue[]>([]);
+  const [validationContext, setValidationContext] = useState<{ definition: string; mode: GeneratorMode } | null>(null);
   const [sampleJson, setSampleJson] = useState<string>('');
   const [schemaAssistantError, setSchemaAssistantError] = useState<string | null>(null);
   const [schemaAssistantMessage, setSchemaAssistantMessage] = useState<string | null>(null);
@@ -407,6 +412,11 @@ export default function App() {
       );
       setRecords(generated);
       setValidationErrors(validation);
+      if (validation.length > 0) {
+        setValidationContext({ definition, mode });
+      } else {
+        setValidationContext(null);
+      }
       if (table) {
         setTableName(table);
       }
@@ -414,10 +424,54 @@ export default function App() {
       setSchemaErrors([(error as Error).message]);
       setRecords([]);
       setValidationErrors([]);
+      setValidationContext(null);
     } finally {
       setIsGenerating(false);
     }
   };
+
+  const validationErrorsWithLocation = useMemo<ValidationIssueWithLocation[]>(() => {
+    if (validationErrors.length === 0) {
+      return [];
+    }
+    const contextDefinition = validationContext?.definition ?? definition;
+    const contextMode = validationContext?.mode ?? mode;
+    if (contextMode !== 'jsonSchema') {
+      return validationErrors.map((issue) => ({ ...issue }));
+    }
+    try {
+      const { pointers } = parseWithPointers(contextDefinition);
+      return validationErrors.map((issue) => {
+        const pointerCandidates: string[] = [];
+        const initialPointer = issue.instancePath || '';
+        if (initialPointer) {
+          pointerCandidates.push(initialPointer);
+          const segments = initialPointer.split('/');
+          while (segments.length > 1) {
+            segments.pop();
+            pointerCandidates.push(segments.join('/'));
+          }
+        } else {
+          pointerCandidates.push('');
+        }
+        let pointerEntry;
+        for (const candidate of pointerCandidates) {
+          const candidateEntry = pointers[candidate];
+          if (candidateEntry) {
+            pointerEntry = candidateEntry;
+            break;
+          }
+        }
+        const fallbackEntry = pointerEntry ?? pointers[''];
+        const location = fallbackEntry?.value ?? fallbackEntry?.key;
+        const line = location?.line != null ? location.line + 1 : undefined;
+        const column = location?.column != null ? location.column + 1 : undefined;
+        return { ...issue, line, column };
+      });
+    } catch {
+      return validationErrors.map((issue) => ({ ...issue }));
+    }
+  }, [validationErrors, validationContext, definition, mode]);
 
   const previewRecords = useMemo(() => records.slice(0, 20), [records]);
   const previewColumns = useMemo(() => {
@@ -688,11 +742,12 @@ export default function App() {
               {activeDefinitionTab === 'definition' ? (
                 mode !== 'manual' ? (
                   <>
-                    <textarea
+                    <LinedTextArea
                       value={definition}
                       onChange={(event) => setDefinition(event.target.value)}
                       spellCheck={false}
                       className="schema-input"
+                      wrapperClassName="schema-input-wrapper"
                       rows={18}
                     />
                     {mode === 'jsonSchema' && (
@@ -943,13 +998,26 @@ export default function App() {
                 </details>
               </>
             )}
-            {validationErrors.length > 0 && (
+            {validationErrorsWithLocation.length > 0 && (
               <div className="warning-box">
                 <h3>{t.validationTitle}</h3>
                 <ul>
-                  {validationErrors.map((error, index) => (
-                    <li key={`${error}-${index}`}>{error}</li>
-                  ))}
+                  {validationErrorsWithLocation.map((error, index) => {
+                    const contextParts: string[] = [];
+                    if (error.line != null) {
+                      contextParts.push(`Satır ${error.line}`);
+                    }
+                    contextParts.push(`Kayıt ${error.recordNumber}`);
+                    const prefix = contextParts.length ? `${contextParts.join(' • ')}: ` : '';
+                    const suggestion = error.suggestion ? ` — Çözüm: ${error.suggestion}` : '';
+                    return (
+                      <li key={`${error.schemaPath}-${error.instancePath}-${error.recordNumber}-${index}`}>
+                        {prefix}
+                        {error.message}
+                        {suggestion}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
