@@ -443,15 +443,34 @@ export default function App() {
       const { pointers } = parseWithPointers(contextDefinition);
       return validationErrors.map((issue) => {
         const pointerCandidates: string[] = [];
-        const initialPointer = issue.instancePath || '';
-        if (initialPointer) {
-          pointerCandidates.push(initialPointer);
-          const segments = initialPointer.split('/');
+
+        const addPointerCandidates = (pointer: string | null | undefined) => {
+          if (pointer == null) {
+            return;
+          }
+          let normalized = pointer;
+          if (normalized.startsWith('#')) {
+            normalized = normalized.slice(1);
+          }
+          if (normalized && !normalized.startsWith('/')) {
+            normalized = `/${normalized}`;
+          }
+          if (normalized === '') {
+            pointerCandidates.push('');
+            return;
+          }
+          pointerCandidates.push(normalized);
+          const segments = normalized.split('/');
           while (segments.length > 1) {
             segments.pop();
-            pointerCandidates.push(segments.join('/'));
+            const candidate = segments.join('/');
+            pointerCandidates.push(candidate);
           }
-        } else {
+        };
+
+        addPointerCandidates(issue.schemaPath);
+        addPointerCandidates(issue.instancePath || '');
+        if (!pointerCandidates.length) {
           pointerCandidates.push('');
         }
         let pointerEntry;
