@@ -982,6 +982,11 @@ textarea:focus {
   overflow: hidden;
 }
 
+.lined-textarea__gutter span {
+  display: block;
+  line-height: 1.6;
+}
+
 .lined-textarea__gutter span + span {
   margin-top: 0;
 }
