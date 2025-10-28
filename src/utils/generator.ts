@@ -2,6 +2,8 @@ import Ajv, { ErrorObject } from 'ajv';
 import addFormats from 'ajv-formats';
 import RandExp from 'randexp';
 
+const currentYear = new Date().getFullYear();
+
 const globalObject = globalThis as Record<string, any>;
 if (!globalObject.process) {
   globalObject.process = { env: {} };
@@ -50,6 +52,282 @@ function toTypeList(type: unknown): string[] {
     return type.filter((item): item is string => typeof item === 'string');
   }
   return typeof type === 'string' ? [type] : [];
+}
+
+function getKeyTokens(key: string): string[] {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[^a-z0-9]+/gi, '_')
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean);
+}
+
+function randomNumberInRange(
+  min: number,
+  max: number,
+  integer: boolean,
+  decimals?: number,
+): number {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return integer ? 0 : 0;
+  }
+  if (min === max) {
+    return integer ? Math.round(min) : min;
+  }
+  let rangeMin = Math.min(min, max);
+  let rangeMax = Math.max(min, max);
+  if (!Number.isFinite(rangeMin) && Number.isFinite(rangeMax)) {
+    rangeMin = rangeMax - 10;
+  } else if (!Number.isFinite(rangeMax) && Number.isFinite(rangeMin)) {
+    rangeMax = rangeMin + 10;
+  }
+  const random = rangeMin + Math.random() * (rangeMax - rangeMin);
+  if (integer) {
+    return Math.round(random);
+  }
+  if (typeof decimals === 'number') {
+    return Number(random.toFixed(decimals));
+  }
+  return Number(random.toFixed(6));
+}
+
+interface NumberAdjustmentOptions {
+  defaultMin?: number;
+  defaultMax?: number;
+  integer?: boolean;
+  decimals?: number;
+  preferPositive?: boolean;
+}
+
+function ensureNumberInRange(
+  value: unknown,
+  schema: any,
+  options: NumberAdjustmentOptions,
+): unknown {
+  const schemaTypes = toTypeList(schema?.type);
+  const preferInteger = options.integer ?? schemaTypes.includes('integer');
+  const hasNumberType = schemaTypes.includes('number') || schemaTypes.includes('integer');
+
+  const numericValue =
+    typeof value === 'number' && Number.isFinite(value)
+      ? value
+      : hasNumberType
+      ? Number(value)
+      : Number.NaN;
+  const valueIsFinite = Number.isFinite(numericValue);
+
+  let min =
+    typeof schema?.minimum === 'number' ? schema.minimum : undefined;
+  let max =
+    typeof schema?.maximum === 'number' ? schema.maximum : undefined;
+
+  if (typeof schema?.exclusiveMinimum === 'number') {
+    const exclusiveMin = schema.exclusiveMinimum;
+    const candidate = preferInteger
+      ? Math.floor(exclusiveMin) + 1
+      : exclusiveMin + Number.EPSILON;
+    min = min != null ? Math.max(min, candidate) : candidate;
+  }
+
+  if (typeof schema?.exclusiveMaximum === 'number') {
+    const exclusiveMax = schema.exclusiveMaximum;
+    const candidate = preferInteger
+      ? Math.ceil(exclusiveMax) - 1
+      : exclusiveMax - Number.EPSILON;
+    max = max != null ? Math.min(max, candidate) : candidate;
+  }
+
+  if (min == null && options.defaultMin != null) {
+    min = options.defaultMin;
+  }
+  if (max == null && options.defaultMax != null) {
+    max = options.defaultMax;
+  }
+
+  if (options.preferPositive && (min == null || min < 0)) {
+    min = Math.max(min ?? 0, 0);
+  }
+
+  if (min != null && max != null && min > max) {
+    const midpoint = (min + max) / 2;
+    min = Math.min(min, midpoint);
+    max = Math.max(max, midpoint);
+  }
+
+  const withinRange =
+    valueIsFinite &&
+    (min == null || numericValue >= min) &&
+    (max == null || numericValue <= max);
+
+  if (withinRange) {
+    if (preferInteger) {
+      return Math.round(numericValue);
+    }
+    if (options.decimals != null) {
+      return Number(numericValue.toFixed(options.decimals));
+    }
+    return numericValue;
+  }
+
+  if (min == null && max == null) {
+    if (!valueIsFinite) {
+      return preferInteger ? 0 : 0;
+    }
+    return preferInteger ? Math.round(numericValue) : numericValue;
+  }
+
+  const effectiveMin = min ?? (max != null ? max - 10 : 0);
+  const effectiveMax = max ?? (min != null ? min + 10 : 1);
+  return randomNumberInRange(effectiveMin, effectiveMax, preferInteger, options.decimals);
+}
+
+function adjustValueForSemanticHint(
+  key: string,
+  schema: any,
+  value: unknown,
+): unknown {
+  if (value == null) {
+    return value;
+  }
+
+  if (schema?.enum || schema?.const) {
+    return value;
+  }
+
+  const schemaTypes = toTypeList(schema?.type);
+  const isNumberLike =
+    schemaTypes.includes('number') ||
+    schemaTypes.includes('integer') ||
+    typeof value === 'number';
+
+  const tokens = getKeyTokens(key);
+  if (tokens.length === 0) {
+    return value;
+  }
+
+  if (
+    tokens.some((token) =>
+      ['age', 'ages', 'yas', 'yasi', 'yaslar'].includes(token),
+    )
+  ) {
+    if (!isNumberLike) {
+      return value;
+    }
+    return ensureNumberInRange(value, schema, {
+      defaultMin: 0,
+      defaultMax: 120,
+      integer: true,
+    });
+  }
+
+  if (tokens.includes('year') || tokens.includes('yil')) {
+    if (!isNumberLike) {
+      return value;
+    }
+    const relatesToBirth = tokens.some((token) =>
+      ['birth', 'dob', 'dogum', 'dogumyili'].includes(token),
+    );
+    return ensureNumberInRange(value, schema, {
+      defaultMin: relatesToBirth ? currentYear - 100 : 1970,
+      defaultMax: relatesToBirth ? currentYear - 10 : currentYear + 1,
+      integer: true,
+    });
+  }
+
+  if (
+    tokens.some((token) =>
+      [
+        'price',
+        'cost',
+        'amount',
+        'total',
+        'salary',
+        'revenue',
+        'budget',
+        'fee',
+        'balance',
+      ].includes(token),
+    )
+  ) {
+    if (!isNumberLike) {
+      return value;
+    }
+    const schemaTypes = toTypeList(schema?.type);
+    const isInteger = schemaTypes.includes('integer');
+    const decimals = !isInteger ? 2 : undefined;
+    return ensureNumberInRange(value, schema, {
+      defaultMin: 0,
+      defaultMax: schema?.maximum ?? 10000,
+      integer: isInteger,
+      decimals,
+      preferPositive: true,
+    });
+  }
+
+  if (
+    tokens.some((token) =>
+      ['percent', 'percentage', 'ratio', 'rate'].includes(token),
+    )
+  ) {
+    if (!isNumberLike) {
+      return value;
+    }
+    const schemaTypes = toTypeList(schema?.type);
+    const isInteger = schemaTypes.includes('integer');
+    return ensureNumberInRange(value, schema, {
+      defaultMin: 0,
+      defaultMax: 100,
+      integer: isInteger,
+      decimals: isInteger ? undefined : 2,
+    });
+  }
+
+  if (
+    tokens.some((token) =>
+      ['count', 'quantity', 'qty', 'adet', 'items'].includes(token),
+    )
+  ) {
+    if (!isNumberLike) {
+      return value;
+    }
+    return ensureNumberInRange(value, schema, {
+      defaultMin: 0,
+      defaultMax: schema?.maximum ?? 1000,
+      integer: true,
+    });
+  }
+
+  return value;
+}
+
+function resolvePropertySchema(schema: any, key: string): any {
+  if (!schema) {
+    return undefined;
+  }
+
+  if (schema.properties && key in schema.properties) {
+    return schema.properties[key];
+  }
+
+  if (schema.patternProperties) {
+    for (const [pattern, propertySchema] of Object.entries(schema.patternProperties)) {
+      try {
+        const matcher = new RegExp(pattern);
+        if (matcher.test(key)) {
+          return propertySchema;
+        }
+      } catch {
+        /* ignore invalid pattern property */
+      }
+    }
+  }
+
+  if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
+    return schema.additionalProperties;
+  }
+
+  return undefined;
 }
 
 function ensurePatternValue(schema: any, current: unknown): string | undefined {
@@ -152,6 +430,15 @@ function applyPatternAwareValues(schema: any, value: unknown): unknown {
         }
       });
     }
+
+    Object.entries(result).forEach(([key, current]) => {
+      const propertySchema = resolvePropertySchema(schema, key);
+      const adjusted = adjustValueForSemanticHint(key, propertySchema, current);
+      if (adjusted !== current) {
+        result[key] = adjusted;
+      }
+    });
+
     return result;
   }
 
