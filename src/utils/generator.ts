@@ -482,6 +482,57 @@ function resolvePropertySchema(schema: any, key: string): any {
   return undefined;
 }
 
+function pruneExtraProperties(schema: any, value: unknown): unknown {
+  if (!schema || value == null) {
+    return value;
+  }
+
+  if (schema.allOf && Array.isArray(schema.allOf)) {
+    return schema.allOf.reduce((acc: unknown, part: any) => pruneExtraProperties(part, acc), value);
+  }
+
+  const types = toTypeList(schema.type);
+
+  if (isPlainObject(value) && (types.includes('object') || schema.properties || schema.patternProperties)) {
+    const result: Record<string, unknown> = { ...value };
+    const allowUnknownProperties =
+      schema.additionalProperties === true || typeof schema.additionalProperties === 'object';
+    const hasExplicitShape = Boolean(schema.properties) || Boolean(schema.patternProperties);
+
+    Object.keys(result).forEach((key) => {
+      const propertySchema = resolvePropertySchema(schema, key);
+      if (propertySchema === false) {
+        delete result[key];
+        return;
+      }
+      if (propertySchema && typeof propertySchema === 'object') {
+        result[key] = pruneExtraProperties(propertySchema, result[key]);
+        return;
+      }
+      if (propertySchema === true) {
+        return;
+      }
+      if (!allowUnknownProperties && hasExplicitShape) {
+        delete result[key];
+      }
+    });
+
+    return result;
+  }
+
+  if (Array.isArray(value) && (types.includes('array') || schema.items)) {
+    const resolveItemSchema = (index: number) => {
+      if (Array.isArray(schema.items)) {
+        return schema.items[index] ?? schema.items[schema.items.length - 1];
+      }
+      return schema.items;
+    };
+    return value.map((item, index) => pruneExtraProperties(resolveItemSchema(index), item));
+  }
+
+  return value;
+}
+
 function ensurePatternValue(schema: any, current: unknown): string | undefined {
   const pattern = schema?.pattern;
   if (!pattern) {
@@ -715,7 +766,8 @@ export async function generateRecords(
   const records: any[] = [];
   const generator = () => {
     const generated = jsf.generate(schema);
-    return applyPatternAwareValues(schema, generated);
+    const normalized = applyPatternAwareValues(schema, generated);
+    return pruneExtraProperties(schema, normalized);
   };
 
   const targetEdgeCases = Math.min(count, Math.round((edgeCaseRatio / 100) * count));
