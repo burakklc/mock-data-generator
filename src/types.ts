@@ -1,4 +1,4 @@
-export type GeneratorMode = 'jsonSchema' | 'createTable' | 'manual';
+export type GeneratorMode = 'jsonSchema' | 'createTable' | 'manual' | 'graphql' | 'typescript';
 export type Language = 'en' | 'tr';
 
 export interface ManualField {

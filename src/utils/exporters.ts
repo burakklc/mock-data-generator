@@ -77,6 +77,51 @@ function formatSqlValue(value: unknown): string {
   return `'${stringValue.replace(/'/g, "''")}'`;
 }
 
+export function toGraphQL(records: Array<Record<string, unknown>>, typeName = 'MockData'): string {
+  if (!records.length) return '';
+
+  const sample = records[0];
+  const fields = Object.entries(sample)
+    .map(([key, value]) => {
+      let type = 'String';
+      if (typeof value === 'number') type = Number.isInteger(value) ? 'Int' : 'Float';
+      if (typeof value === 'boolean') type = 'Boolean';
+      return `  ${key}: ${type}`;
+    })
+    .join('\n');
+
+  const schema = `type ${typeName} {\n${fields}\n}`;
+  const data = records
+    .map((record) => {
+      const props = Object.entries(record)
+        .map(([key, value]) => `    ${key}: ${JSON.stringify(value)}`)
+        .join('\n');
+      return `  {\n${props}\n  }`;
+    })
+    .join(',\n');
+
+  return `${schema}\n\nconst data: ${typeName}[] = [\n${data}\n];`;
+}
+
+export function toTypeScript(records: Array<Record<string, unknown>>, interfaceName = 'MockData'): string {
+  if (!records.length) return '';
+
+  const sample = records[0];
+  const fields = Object.entries(sample)
+    .map(([key, value]) => {
+      let type = 'string';
+      if (typeof value === 'number') type = 'number';
+      if (typeof value === 'boolean') type = 'boolean';
+      return `  ${key}: ${type};`;
+    })
+    .join('\n');
+
+  const interfaceDef = `interface ${interfaceName} {\n${fields}\n}`;
+  const data = `const data: ${interfaceName}[] = ${JSON.stringify(records, null, 2)};`;
+
+  return `${interfaceDef}\n\n${data}`;
+}
+
 export function downloadJson(records: unknown[], filename = 'mock-data.json'): void {
   saveAs(new Blob([toJsonString(records)], { type: 'application/json' }), filename);
 }
@@ -91,4 +136,20 @@ export function downloadSql(
   filename = 'mock-data.sql',
 ): void {
   saveAs(new Blob([toSqlInsert(records, tableName)], { type: 'text/plain' }), filename);
+}
+
+export function downloadGraphQL(
+  records: Array<Record<string, unknown>>,
+  typeName: string,
+  filename = 'mock-data.graphql',
+): void {
+  saveAs(new Blob([toGraphQL(records, typeName)], { type: 'text/plain' }), filename);
+}
+
+export function downloadTypeScript(
+  records: Array<Record<string, unknown>>,
+  interfaceName: string,
+  filename = 'mock-data.ts',
+): void {
+  saveAs(new Blob([toTypeScript(records, interfaceName)], { type: 'text/plain' }), filename);
 }
