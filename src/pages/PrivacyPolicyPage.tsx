@@ -1,6 +1,13 @@
+import SEO from '../components/SEO';
+
 export default function PrivacyPolicyPage() {
   return (
     <article className="content-page">
+      <SEO
+        title="Privacy Policy"
+        description="Read our Privacy Policy to understand how MockData.net collects, uses, and protects your information."
+        canonicalUrl="https://mockdatagenerator.app/privacy-policy"
+      />
       <h1>Privacy Policy</h1>
       <p>
         This Privacy Policy explains how MockData.net ("we", "our", or "us") collects, uses and protects information

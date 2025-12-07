@@ -156,6 +156,8 @@ function getDefaultInput(mode: GeneratorMode): string {
   return '';
 }
 
+import SEO from '../components/SEO';
+
 export default function HomePage() {
   const [mode, setMode] = useState<GeneratorMode>('jsonSchema');
   const [language, setLanguage] = useState<Language>(() => {
@@ -506,100 +508,105 @@ export default function HomePage() {
 
   return (
     <div className="app">
+      <SEO
+        title="Mock Data Generator"
+        description="Generate realistic mock data fast from JSON Schema, SQL CREATE TABLE scripts or manual definitions. Export to JSON, CSV or SQL for development and testing."
+        keywords="mock data generator,fake data,json schema,mock json,sql create table,csv export,test data"
+      />
       <header className="app__header">
-      <div className="app__brand">
-        <div className="brand-mark" aria-hidden="true">
-          MD
-        </div>
-        <div className="brand-copy">
-          <h1>Mock Data Generator</h1>
-          <p>{t.brandTagline}</p>
-        </div>
-      </div>
-      <button
-        type="button"
-        className={`menu-toggle ${isNavOpen ? 'is-active' : ''}`}
-        onClick={() => setIsNavOpen((previous) => !previous)}
-        aria-label={isNavOpen ? t.menuToggle.close : t.menuToggle.open}
-        aria-expanded={isNavOpen}
-        aria-controls="app-navigation"
-      >
-        <span className="menu-icon" />
-      </button>
-      <nav id="app-navigation" className={`app__nav ${isNavOpen ? 'is-open' : ''}`}>
-        <div className="nav-inner">
-          <div className="nav-section">
-            <span className="nav-label">{t.nav.viewLabel}</span>
-            <div className="view-tabs">
-              <button
-                type="button"
-                className={activeMainTab === 'generator' ? 'active' : ''}
-                onClick={() => handleMainTabChange('generator')}
-              >
-                {t.nav.viewTabs.generator}
-              </button>
-              <button
-                type="button"
-                className={activeMainTab === 'howTo' ? 'active' : ''}
-                onClick={() => handleMainTabChange('howTo')}
-              >
-                {t.nav.viewTabs.howTo}
-              </button>
-            </div>
+        <div className="app__brand">
+          <div className="brand-mark" aria-hidden="true">
+            MD
           </div>
-          <div className="nav-section">
-            <span className="nav-label">{t.nav.modeLabel}</span>
-            <div className="mode-selector">
-              {(Object.keys(t.modeNames) as GeneratorMode[]).map((key) => (
+          <div className="brand-copy">
+            <h1>Mock Data Generator</h1>
+            <p>{t.brandTagline}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          className={`menu-toggle ${isNavOpen ? 'is-active' : ''}`}
+          onClick={() => setIsNavOpen((previous) => !previous)}
+          aria-label={isNavOpen ? t.menuToggle.close : t.menuToggle.open}
+          aria-expanded={isNavOpen}
+          aria-controls="app-navigation"
+        >
+          <span className="menu-icon" />
+        </button>
+        <nav id="app-navigation" className={`app__nav ${isNavOpen ? 'is-open' : ''}`}>
+          <div className="nav-inner">
+            <div className="nav-section">
+              <span className="nav-label">{t.nav.viewLabel}</span>
+              <div className="view-tabs">
                 <button
-                  key={key}
-                  className={key === mode ? 'active' : ''}
                   type="button"
-                  onClick={() => handleModeChange(key)}
+                  className={activeMainTab === 'generator' ? 'active' : ''}
+                  onClick={() => handleMainTabChange('generator')}
                 >
-                  {t.modeNames[key]}
+                  {t.nav.viewTabs.generator}
                 </button>
-              ))}
+                <button
+                  type="button"
+                  className={activeMainTab === 'howTo' ? 'active' : ''}
+                  onClick={() => handleMainTabChange('howTo')}
+                >
+                  {t.nav.viewTabs.howTo}
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="nav-section nav-section--language">
-            <span className="nav-label">{t.nav.languageLabel}</span>
-            <div className="language-switcher">
-              {languageOptions.map((option) => {
-                const isActive = option.value === language;
-                return (
+            <div className="nav-section">
+              <span className="nav-label">{t.nav.modeLabel}</span>
+              <div className="mode-selector">
+                {(Object.keys(t.modeNames) as GeneratorMode[]).map((key) => (
                   <button
-                    key={option.value}
+                    key={key}
+                    className={key === mode ? 'active' : ''}
                     type="button"
-                    className={isActive ? 'active' : ''}
-                    onClick={() => {
-                      if (!isActive) {
-                        setLanguage(option.value);
-                      }
-                    }}
-                    aria-pressed={isActive}
-                    aria-label={option.fullLabel}
-                    title={option.fullLabel}
+                    onClick={() => handleModeChange(key)}
                   >
-                    {option.shortLabel}
+                    {t.modeNames[key]}
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="nav-footer">
-            <button
-              type="button"
-              className={`theme-toggle ${isDarkMode ? 'is-dark' : ''}`}
-              onClick={() => setIsDarkMode((previous) => !previous)}
-              aria-pressed={isDarkMode}
-              aria-label={isDarkMode ? t.themeToggle.toLightAria : t.themeToggle.toDarkAria}
-              title={isDarkMode ? t.themeToggle.toLightAria : t.themeToggle.toDarkAria}
-            >
-              <span className="theme-toggle__icon" aria-hidden="true">
-                {isDarkMode ? (
-                  <svg viewBox="0 0 24 24">
-                    <path
+            <div className="nav-section nav-section--language">
+              <span className="nav-label">{t.nav.languageLabel}</span>
+              <div className="language-switcher">
+                {languageOptions.map((option) => {
+                  const isActive = option.value === language;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={isActive ? 'active' : ''}
+                      onClick={() => {
+                        if (!isActive) {
+                          setLanguage(option.value);
+                        }
+                      }}
+                      aria-pressed={isActive}
+                      aria-label={option.fullLabel}
+                      title={option.fullLabel}
+                    >
+                      {option.shortLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="nav-footer">
+              <button
+                type="button"
+                className={`theme-toggle ${isDarkMode ? 'is-dark' : ''}`}
+                onClick={() => setIsDarkMode((previous) => !previous)}
+                aria-pressed={isDarkMode}
+                aria-label={isDarkMode ? t.themeToggle.toLightAria : t.themeToggle.toDarkAria}
+                title={isDarkMode ? t.themeToggle.toLightAria : t.themeToggle.toDarkAria}
+              >
+                <span className="theme-toggle__icon" aria-hidden="true">
+                  {isDarkMode ? (
+                    <svg viewBox="0 0 24 24">
+                      <path
                         d="M15.25 4.5a.75.75 0 0 0-.71 1 6.5 6.5 0 1 1-8.04 8.04.75.75 0 0 0-1 .71 8 8 0 1 0 9.75-9.75z"
                         fill="currentColor"
                       />
@@ -631,9 +638,9 @@ export default function HomePage() {
 
       {activeMainTab === 'generator' ? (
         <>
-          <section className="hero">
+          <header className="hero">
             <div className="hero__content">
-              <h2>{t.hero.title}</h2>
+              <h1>{t.hero.title}</h1>
               <p>{t.hero.description}</p>
               <div className="hero__actions">
                 <button
@@ -684,7 +691,7 @@ export default function HomePage() {
                 })}
               </div>
             </div>
-          </section>
+          </header>
           <section className="home-story">
             <div className="home-story__text">
               <h2>Mock data that keeps up with your ideas</h2>
@@ -722,7 +729,7 @@ export default function HomePage() {
               </div>
             </div>
           </section>
-          <main className="layout">
+          <section className="layout">
             <section className="panel panel--definition" ref={definitionPanelRef}>
               <div className="panel__header">
                 <h2>{t.definitionPanel.title}</h2>
@@ -900,185 +907,185 @@ export default function HomePage() {
               )}
             </section>
 
-          <section className="panel panel--preview">
-            <div className="panel__header panel__header--stack">
-              <div className="panel__title">
-                <h2>{t.previewPanel.title}</h2>
-                <p className="panel__subtitle">{t.previewPanel.subtitle}</p>
-              </div>
-              {records.length > 0 && (
-                <div className="preview-meta">
-                  <span className="preview-chip">{t.previewPanel.recordChip(records.length)}</span>
-                  <span className="preview-chip preview-chip--muted">
-                    {previewRecords.length < records.length
-                      ? t.previewPanel.limitedChip(previewRecords.length, records.length)
-                      : t.previewPanel.allChip(previewRecords.length)}
-                  </span>
+            <section className="panel panel--preview">
+              <div className="panel__header panel__header--stack">
+                <div className="panel__title">
+                  <h2>{t.previewPanel.title}</h2>
+                  <p className="panel__subtitle">{t.previewPanel.subtitle}</p>
                 </div>
-              )}
-            </div>
-            <div className="export-actions">
-              <button
-                type="button"
-                onClick={() => downloadJson(records)}
-                disabled={exportDisabled}
-                data-tooltip={t.exportButtons.json.tooltip}
-                title={t.exportButtons.json.tooltip}
-              >
-                <span className="export-actions__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M12 3v12.25"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                    <path
-                      d="M8.5 12.5 12 16l3.5-3.5"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                    <path
-                      d="M6 18.5h12"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  </svg>
-                </span>
-                <span className="export-actions__body">
-                  <span className="export-actions__label">{t.exportButtons.json.label}</span>
-                  <span className="export-actions__description">{t.exportButtons.json.description}</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => downloadCsv(records)}
-                disabled={exportDisabled}
-                data-tooltip={t.exportButtons.csv.tooltip}
-                title={t.exportButtons.csv.tooltip}
-              >
-                <span className="export-actions__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M6.5 4A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 17.5 4h-11z"
-                      fill="currentColor"
-                      opacity="0.18"
-                    />
-                    <path
-                      d="M7.5 8h9M7.5 12h9M7.5 16h9"
-                      stroke="currentColor"
-                      strokeWidth="1.4"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  </svg>
-                </span>
-                <span className="export-actions__body">
-                  <span className="export-actions__label">{t.exportButtons.csv.label}</span>
-                  <span className="export-actions__description">{t.exportButtons.csv.description}</span>
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => downloadSql(records, tableName || 'mock_data')}
-                disabled={exportDisabled}
-                data-tooltip={t.exportButtons.sql.tooltip}
-                title={t.exportButtons.sql.tooltip}
-              >
-                <span className="export-actions__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v11A2.5 2.5 0 0 1 16.5 20h-9A2.5 2.5 0 0 1 5 17.5v-11z"
-                      fill="currentColor"
-                    />
-                    <path
-                      d="M8.5 9h7M8.5 12h4"
-                      stroke="var(--color-button-text)"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                    <path
-                      d="M8.5 15h3"
-                      stroke="var(--color-button-text)"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  </svg>
-                </span>
-                <span className="export-actions__body">
-                  <span className="export-actions__label">{t.exportButtons.sql.label}</span>
-                  <span className="export-actions__description">{t.exportButtons.sql.description}</span>
-                </span>
-              </button>
-            </div>
-            {records.length === 0 ? (
-              <p className="empty">{t.previewPanel.empty}</p>
-            ) : (
-              <>
-                <div className="table-wrapper">
-                  <table>
-                    <thead>
-                      <tr>
-                        {previewColumns.map((column) => (
-                          <th key={column}>{column}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {previewRecords.map((record, index) => (
-                        <tr key={index}>
+                {records.length > 0 && (
+                  <div className="preview-meta">
+                    <span className="preview-chip">{t.previewPanel.recordChip(records.length)}</span>
+                    <span className="preview-chip preview-chip--muted">
+                      {previewRecords.length < records.length
+                        ? t.previewPanel.limitedChip(previewRecords.length, records.length)
+                        : t.previewPanel.allChip(previewRecords.length)}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="export-actions">
+                <button
+                  type="button"
+                  onClick={() => downloadJson(records)}
+                  disabled={exportDisabled}
+                  data-tooltip={t.exportButtons.json.tooltip}
+                  title={t.exportButtons.json.tooltip}
+                >
+                  <span className="export-actions__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M12 3v12.25"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                      <path
+                        d="M8.5 12.5 12 16l3.5-3.5"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                      <path
+                        d="M6 18.5h12"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </svg>
+                  </span>
+                  <span className="export-actions__body">
+                    <span className="export-actions__label">{t.exportButtons.json.label}</span>
+                    <span className="export-actions__description">{t.exportButtons.json.description}</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadCsv(records)}
+                  disabled={exportDisabled}
+                  data-tooltip={t.exportButtons.csv.tooltip}
+                  title={t.exportButtons.csv.tooltip}
+                >
+                  <span className="export-actions__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M6.5 4A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20h11a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 17.5 4h-11z"
+                        fill="currentColor"
+                        opacity="0.18"
+                      />
+                      <path
+                        d="M7.5 8h9M7.5 12h9M7.5 16h9"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </svg>
+                  </span>
+                  <span className="export-actions__body">
+                    <span className="export-actions__label">{t.exportButtons.csv.label}</span>
+                    <span className="export-actions__description">{t.exportButtons.csv.description}</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => downloadSql(records, tableName || 'mock_data')}
+                  disabled={exportDisabled}
+                  data-tooltip={t.exportButtons.sql.tooltip}
+                  title={t.exportButtons.sql.tooltip}
+                >
+                  <span className="export-actions__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v11A2.5 2.5 0 0 1 16.5 20h-9A2.5 2.5 0 0 1 5 17.5v-11z"
+                        fill="currentColor"
+                      />
+                      <path
+                        d="M8.5 9h7M8.5 12h4"
+                        stroke="var(--color-button-text)"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                      <path
+                        d="M8.5 15h3"
+                        stroke="var(--color-button-text)"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        fill="none"
+                      />
+                    </svg>
+                  </span>
+                  <span className="export-actions__body">
+                    <span className="export-actions__label">{t.exportButtons.sql.label}</span>
+                    <span className="export-actions__description">{t.exportButtons.sql.description}</span>
+                  </span>
+                </button>
+              </div>
+              {records.length === 0 ? (
+                <p className="empty">{t.previewPanel.empty}</p>
+              ) : (
+                <>
+                  <div className="table-wrapper">
+                    <table>
+                      <thead>
+                        <tr>
                           {previewColumns.map((column) => (
-                            <td key={column}>{formatCell(record[column])}</td>
+                            <th key={column}>{column}</th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {previewRecords.map((record, index) => (
+                          <tr key={index}>
+                            {previewColumns.map((column) => (
+                              <td key={column}>{formatCell(record[column])}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <details>
+                    <summary>{t.previewPanel.jsonSummary}</summary>
+                    <pre className="json-preview">{jsonPreview}</pre>
+                  </details>
+                </>
+              )}
+              {validationErrorsWithLocation.length > 0 && (
+                <div className="warning-box">
+                  <h3>{t.validationTitle}</h3>
+                  <ul>
+                    {validationErrorsWithLocation.map((error, index) => {
+                      const contextParts: string[] = [];
+                      if (error.line != null) {
+                        contextParts.push(`Satır ${error.line}`);
+                      }
+                      contextParts.push(`Kayıt ${error.recordNumber}`);
+                      const prefix = contextParts.length ? `${contextParts.join(' • ')}: ` : '';
+                      const suggestion = error.suggestion ? ` — Çözüm: ${error.suggestion}` : '';
+                      return (
+                        <li key={`${error.schemaPath}-${error.instancePath}-${error.recordNumber}-${index}`}>
+                          {prefix}
+                          {error.message}
+                          {suggestion}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-                <details>
-                  <summary>{t.previewPanel.jsonSummary}</summary>
-                  <pre className="json-preview">{jsonPreview}</pre>
-                </details>
-              </>
-            )}
-            {validationErrorsWithLocation.length > 0 && (
-              <div className="warning-box">
-                <h3>{t.validationTitle}</h3>
-                <ul>
-                  {validationErrorsWithLocation.map((error, index) => {
-                    const contextParts: string[] = [];
-                    if (error.line != null) {
-                      contextParts.push(`Satır ${error.line}`);
-                    }
-                    contextParts.push(`Kayıt ${error.recordNumber}`);
-                    const prefix = contextParts.length ? `${contextParts.join(' • ')}: ` : '';
-                    const suggestion = error.suggestion ? ` — Çözüm: ${error.suggestion}` : '';
-                    return (
-                      <li key={`${error.schemaPath}-${error.instancePath}-${error.recordNumber}-${index}`}>
-                        {prefix}
-                        {error.message}
-                        {suggestion}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
+              )}
+            </section>
           </section>
-        </main>
         </>
       ) : (
         <main className="layout layout--single">

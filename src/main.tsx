@@ -4,9 +4,13 @@ import App from './App';
 import { Analytics } from '@vercel/analytics/react';
 import './styles.css';
 
+import { HelmetProvider } from 'react-helmet-async';
+
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <App />
-    <Analytics />
+    <HelmetProvider>
+      <App />
+      <Analytics />
+    </HelmetProvider>
   </React.StrictMode>,
 );

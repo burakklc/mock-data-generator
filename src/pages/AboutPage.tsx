@@ -1,6 +1,13 @@
+import SEO from '../components/SEO';
+
 export default function AboutPage() {
   return (
     <article className="content-page">
+      <SEO
+        title="About Us"
+        description="Learn about MockData.net, a powerful tool for generating realistic test data for developers and QA teams."
+        canonicalUrl="https://mockdatagenerator.app/about"
+      />
       <h1>About MockData.net</h1>
       <section>
         <p>

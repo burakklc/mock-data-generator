@@ -1,4 +1,5 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
+import SEO from '../components/SEO';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
@@ -17,6 +18,11 @@ export default function ContactPage() {
 
   return (
     <article className="content-page">
+      <SEO
+        title="Contact Us"
+        description="Get in touch with the MockData.net team for support, feedback, or feature requests."
+        canonicalUrl="https://mockdatagenerator.app/contact"
+      />
       <h1>Contact</h1>
       <p>
         If you have any questions, feedback or suggestions about MockData.net, feel free to reach out. You can contact

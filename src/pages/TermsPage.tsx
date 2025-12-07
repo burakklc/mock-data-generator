@@ -1,6 +1,13 @@
+import SEO from '../components/SEO';
+
 export default function TermsPage() {
   return (
     <article className="content-page">
+      <SEO
+        title="Terms of Service"
+        description="Review the Terms of Service for using MockData.net."
+        canonicalUrl="https://mockdatagenerator.app/terms-of-service"
+      />
       <h1>Terms of Service</h1>
       <p>
         These Terms of Service ("Terms") govern your use of MockData.net ("the Service"). By accessing or using the

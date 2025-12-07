@@ -1,6 +1,13 @@
+import SEO from '../components/SEO';
+
 export default function CookiePolicyPage() {
   return (
     <article className="content-page">
+      <SEO
+        title="Cookie Policy"
+        description="Understand how MockData.net uses cookies and similar technologies."
+        canonicalUrl="https://mockdatagenerator.app/cookie-policy"
+      />
       <h1>Cookie Policy</h1>
       <p>This Cookie Policy explains how MockData.net uses cookies and similar technologies.</p>
 

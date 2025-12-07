@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
 import { getBlogPost } from '../data/blogPosts';
+import SEO from '../components/SEO';
 
 export default function BlogPostPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -8,6 +9,7 @@ export default function BlogPostPage() {
   if (!post) {
     return (
       <section className="content-page">
+        <SEO title="Post Not Found" description="The requested blog post could not be found." />
         <h1>Post not found</h1>
         <p>The article you are looking for does not exist yet.</p>
         <Link to="/blog">← Back to blog</Link>
@@ -17,6 +19,12 @@ export default function BlogPostPage() {
 
   return (
     <article className="content-page blog-post">
+      <SEO
+        title={post.title}
+        description={post.excerpt}
+        type="article"
+        canonicalUrl={`https://mockdatagenerator.app/blog/${slug}`}
+      />
       <p className="blog-post__back">
         <Link to="/blog">← Back to blog</Link>
       </p>
