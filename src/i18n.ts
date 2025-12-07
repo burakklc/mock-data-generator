@@ -147,6 +147,8 @@ export const translations: Record<Language, Translations> = {
       jsonSchema: 'JSON Schema',
       createTable: 'CREATE TABLE',
       manual: 'Manual Definition',
+      graphql: 'GraphQL',
+      typescript: 'TypeScript',
     },
     modeCards: {
       jsonSchema: {
@@ -160,6 +162,14 @@ export const translations: Record<Language, Translations> = {
       manual: {
         description: 'Add fields from scratch, fine-tune constraints and share the generated JSON Schema.',
         highlight: 'Instant schema preview',
+      },
+      graphql: {
+        description: 'Generate GraphQL Schema (SDL) and mock resolvers with realistic data.',
+        highlight: 'SDL & Resolvers',
+      },
+      typescript: {
+        description: 'Create TypeScript interfaces and strongly typed mock data arrays.',
+        highlight: 'Type-safe mocks',
       },
     },
     modeSelectedLabel: 'Selected',
@@ -285,6 +295,8 @@ export const translations: Record<Language, Translations> = {
       jsonSchema: 'JSON Schema',
       createTable: 'CREATE TABLE',
       manual: 'Manuel Tanım',
+      graphql: 'GraphQL',
+      typescript: 'TypeScript',
     },
     modeCards: {
       jsonSchema: {
@@ -298,6 +310,14 @@ export const translations: Record<Language, Translations> = {
       manual: {
         description: 'Sıfırdan alanlar ekleyin, JSON Schema çıktısını düzenleyin ve paylaşın.',
         highlight: 'Anında şema çıktısı',
+      },
+      graphql: {
+        description: 'GraphQL Şeması (SDL) ve gerçekçi verilerle mock resolverlar üretin.',
+        highlight: 'SDL & Resolverlar',
+      },
+      typescript: {
+        description: 'TypeScript arayüzleri ve tip güvenli mock veri dizileri oluşturun.',
+        highlight: 'Tip güvenli mocklar',
       },
     },
     modeSelectedLabel: 'Seçili',
