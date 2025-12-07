@@ -157,6 +157,7 @@ function getDefaultInput(mode: GeneratorMode): string {
 }
 
 import SEO from '../components/SEO';
+import AdUnit from '../components/AdUnit';
 
 export default function HomePage() {
   const [mode, setMode] = useState<GeneratorMode>('jsonSchema');
@@ -724,9 +725,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="home-story__aside">
-              <div className="ad-slot" aria-label="Advertisement placeholder">
-                Advertisement placeholder
-              </div>
+              <AdUnit slot="1234567890" className="home-story__ad" />
             </div>
           </section>
           <section className="layout">

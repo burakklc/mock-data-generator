@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { getBlogPost } from '../data/blogPosts';
 import SEO from '../components/SEO';
+import AdUnit from '../components/AdUnit';
 
 export default function BlogPostPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -44,9 +45,7 @@ export default function BlogPostPage() {
           )}
         </section>
       ))}
-      <div className="ad-slot" aria-label="Advertisement placeholder">
-        Advertisement placeholder
-      </div>
+      <AdUnit slot="1234567890" />
     </article>
   );
 }

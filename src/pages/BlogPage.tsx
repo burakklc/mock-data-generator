@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { blogPosts } from '../data/blogPosts';
 import SEO from '../components/SEO';
+import AdUnit from '../components/AdUnit';
 
 export default function BlogPage() {
   return (
@@ -23,9 +24,7 @@ export default function BlogPage() {
           </article>
         ))}
       </div>
-      <div className="ad-slot" aria-label="Advertisement placeholder">
-        Advertisement placeholder
-      </div>
+      <AdUnit slot="1234567890" />
     </section>
   );
 }

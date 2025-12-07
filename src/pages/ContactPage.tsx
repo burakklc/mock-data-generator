@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import SEO from '../components/SEO';
+import AdUnit from '../components/AdUnit';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
@@ -53,9 +54,7 @@ export default function ContactPage() {
         <button type="submit">Send Message</button>
         {submitted && <p className="contact-form__success">Thanks! Your message has been noted.</p>}
       </form>
-      <div className="ad-slot" aria-label="Advertisement placeholder">
-        Advertisement placeholder
-      </div>
+      <AdUnit slot="1234567890" />
     </article>
   );
 }

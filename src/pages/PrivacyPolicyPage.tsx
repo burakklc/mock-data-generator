@@ -1,4 +1,5 @@
 import SEO from '../components/SEO';
+import AdUnit from '../components/AdUnit';
 
 export default function PrivacyPolicyPage() {
   return (
@@ -85,9 +86,7 @@ export default function PrivacyPolicyPage() {
           <a href="mailto:support@mockdata.net">support@mockdata.net</a>.
         </p>
       </section>
-      <div className="ad-slot" aria-label="Advertisement placeholder">
-        Advertisement placeholder
-      </div>
+      <AdUnit slot="1234567890" />
     </article>
   );
 }
