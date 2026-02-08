@@ -1,416 +1,257 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { parse as parseWithPointers } from 'json-source-map';
-import type { GeneratorMode, Language, ManualField } from '../types';
-import ManualFieldEditor from '../components/ManualFieldEditor';
-import LinedTextArea from '../components/LinedTextArea';
-import { parseCreateTableScript } from '../utils/sqlParser';
-import { manualFieldsToSchema } from '../utils/manualSchema';
-import { generateRecords, type ValidationIssue } from '../utils/generator';
+import { useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  downloadCsv,
-  downloadJson,
-  downloadSql,
-  downloadGraphQL,
-  downloadTypeScript,
+  FileJson,
+  Database,
+  Table,
+  Code2,
+  Download,
+  Copy,
+  Check,
+  Settings2,
+  RefreshCw
+} from 'lucide-react';
+
+import { DashboardShell } from '../components/DashboardShell';
+import { Card, CardHeader, CardContent } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Sidebar, type FieldType } from '../components/Sidebar';
+import { CodePreview } from '../components/CodePreview';
+import { generateRecords, type GenerationOutcome } from '../utils/generator';
+import {
   toJsonString,
-  toGraphQL,
-  toTypeScript,
+  toCsvString,
+  toSqlInsert,
+  downloadJson,
+  downloadCsv,
+  downloadSql
 } from '../utils/exporters';
-import { inferSchemaFromSample } from '../utils/schemaInference';
-import { getExampleSnippets, type ExampleSnippet } from '../data/examples';
-import { getHowToSections } from '../data/howTo';
-import { languageOptions, translations } from '../i18n';
-import SEO from '../components/SEO';
-import AdUnit from '../components/AdUnit';
+import { manualFieldsToSchema } from '../utils/manualSchema';
+import { createManualField } from '../pages/HomePage'; // Importing helper from original file if possible, or redefine
 
-type ValidationIssueWithLocation = ValidationIssue & { line?: number; column?: number };
-
-const modeIcons: Record<GeneratorMode, ReactNode> = {
-  jsonSchema: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <path d="M16 13H8" />
-      <path d="M16 17H8" />
-      <path d="M10 9H8" />
-    </svg>
-  ),
-  createTable: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18" />
-    </svg>
-  ),
-  manual: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
-  ),
-  graphql: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 2l8.5 5v10L12 22l-8.5-5V7L12 2z" />
-      <path d="M12 12l8.5-5M12 12v10M12 12L3.5 7" />
-    </svg>
-  ),
-  typescript: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-      <line x1="12" y1="22.08" x2="12" y2="12" />
-    </svg>
-  ),
-};
-
-const initialSchema = `{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "id": { "type": "integer", "minimum": 1 },
-    "name": { "type": "string", "minLength": 3 },
-    "email": { "type": "string", "format": "email" }
-  },
-  "required": ["id", "name", "email"]
-}`;
-
-const initialCreateTable = `CREATE TABLE users (
-  id INTEGER NOT NULL,
-  full_name VARCHAR(100) NOT NULL,
-  email VARCHAR(150) NOT NULL,
-  age INTEGER CHECK (age >= 18)
-);`;
-
-function createManualField(): ManualField {
+// Re-defining helper since we are replacing the file content
+function createNewField(): FieldType {
   return {
     id: Math.random().toString(36).slice(2),
-    name: '',
+    name: 'newField',
     type: 'string',
-    required: true,
   };
 }
 
-function getDefaultInput(mode: GeneratorMode): string {
-  if (mode === 'jsonSchema' || mode === 'typescript' || mode === 'graphql') return initialSchema;
-  if (mode === 'createTable') return initialCreateTable;
-  return '';
-}
+const TOOLS = [
+  {
+    id: 'json',
+    title: 'JSON Generator',
+    description: 'Generate robust JSON datasets with schema validation.',
+    icon: FileJson,
+    color: 'text-yellow-400',
+    preview: '{ "id": 1, "name": "..." }'
+  },
+  {
+    id: 'csv',
+    title: 'CSV / Excel',
+    description: 'Create spreadsheet-ready data for analysis.',
+    icon: Table,
+    color: 'text-green-400',
+    preview: 'id,name\n1,Alice'
+  },
+  {
+    id: 'sql',
+    title: 'SQL Insert',
+    description: 'Generate INSERT statements for your database.',
+    icon: Database,
+    color: 'text-blue-400',
+    preview: 'INSERT INTO users...'
+  },
+  {
+    id: 'api',
+    title: 'Custom API',
+    description: 'Mock API endpoints with dynamic responses.',
+    icon: Code2,
+    color: 'text-purple-400',
+    preview: 'GET /api/users'
+  }
+];
 
 export default function HomePage() {
-  const [mode, setMode] = useState<GeneratorMode>('jsonSchema');
-  const [language, setLanguage] = useState<Language>(() => {
-    if (typeof window === 'undefined') return 'en';
-    const stored = window.localStorage.getItem('mdg.language');
-    return stored === 'tr' ? 'tr' : 'en';
-  });
-  const [definition, setDefinition] = useState<string>(getDefaultInput('jsonSchema'));
-  const [manualFields, setManualFields] = useState<ManualField[]>([createManualField()]);
-  const [recordCount, setRecordCount] = useState<number>(5);
-  const [edgeCaseRatio, setEdgeCaseRatio] = useState<number>(0);
-  const [records, setRecords] = useState<any[]>([]);
-  const [tableName, setTableName] = useState<string>('mock_data');
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [schemaErrors, setSchemaErrors] = useState<string[]>([]);
-  const [validationErrors, setValidationErrors] = useState<ValidationIssue[]>([]);
-  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    const stored = window.localStorage.getItem('mdg.theme');
-    if (stored === 'dark') return true;
-    if (stored === 'light') return false;
-    return window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
-  });
+  const [view, setView] = useState<'hero' | 'workspace'>('hero');
+  const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [fields, setFields] = useState<FieldType[]>([
+    { id: '1', name: 'id', type: 'integer' },
+    { id: '2', name: 'firstName', type: 'string' },
+    { id: '3', name: 'email', type: 'email' },
+  ]);
+  const [recordCount, setRecordCount] = useState(10);
+  const [generatedData, setGeneratedData] = useState<any[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const t = translations[language];
-  const generatorRef = useRef<HTMLDivElement>(null);
+  // Initial generation on load or field change
+  useMemo(() => {
+    // Debounce generation in real app
+    const generate = async () => {
+      // Convert simplified fields to manual fields format expected by generator
+      const manualFields = fields.map(f => ({
+        id: f.id,
+        name: f.name,
+        type: f.type as any, // casting for simplicity in this refactor
+        required: true
+      }));
 
-  useEffect(() => {
-    if (typeof document === 'undefined') return;
-    const root = document.documentElement;
-    root.classList.toggle('theme-dark', isDarkMode);
-    window.localStorage.setItem('mdg.theme', isDarkMode ? 'dark' : 'light');
-  }, [isDarkMode]);
-
-  useEffect(() => {
-    window.localStorage.setItem('mdg.language', language);
-  }, [language]);
-
-  const handleModeChange = (newMode: GeneratorMode) => {
-    setMode(newMode);
-    setDefinition(getDefaultInput(newMode));
-    setRecords([]);
-    setSchemaErrors([]);
-    if (newMode === 'manual') {
-      setManualFields([createManualField()]);
-    }
-  };
-
-  const handleManualFieldChange = (nextField: ManualField) => {
-    setManualFields((previous) => previous.map((field) => (field.id === nextField.id ? nextField : field)));
-  };
-
-  const handleManualFieldRemove = (id: string) => {
-    setManualFields((previous) => previous.filter((field) => field.id !== id));
-  };
-
-  const addManualField = () => {
-    setManualFields((previous) => [...previous, createManualField()]);
-  };
-
-  const handleGenerate = async () => {
-    setIsGenerating(true);
-    setSchemaErrors([]);
-    setValidationErrors([]);
-    try {
-      let schema: any;
-      let table: string | undefined;
-
-      if (mode === 'manual') {
-        const result = manualFieldsToSchema(manualFields);
-        schema = result.schema;
-        if (result.errors.length) throw new Error(result.errors.join(', '));
-      } else if (mode === 'createTable') {
-        const result = parseCreateTableScript(definition);
-        schema = result.schema;
-        table = result.tableName;
-        if (result.errors.length) throw new Error(result.errors.join(', '));
-      } else {
-        try {
-          schema = JSON.parse(definition);
-        } catch (e) {
-          throw new Error('Invalid JSON Schema');
-        }
+      const result = manualFieldsToSchema(manualFields);
+      if (!result.errors.length) {
+        const outcome = await generateRecords(result.schema, recordCount, 0);
+        setGeneratedData(outcome.records);
       }
+    };
+    generate();
+  }, [fields, recordCount]);
 
-      if (table) setTableName(table);
+  const previewCode = useMemo(() => {
+    if (!generatedData.length) return '';
+    if (activeTool === 'csv') return toCsvString(generatedData);
+    if (activeTool === 'sql') return toSqlInsert(generatedData, 'mock_table');
+    return toJsonString(generatedData);
+  }, [generatedData, activeTool]);
 
-      const { records: generated, validationErrors: validation } = await generateRecords(
-        schema,
-        recordCount,
-        edgeCaseRatio,
-      );
-      setRecords(generated);
-      setValidationErrors(validation);
-    } catch (error) {
-      setSchemaErrors([(error as Error).message]);
-      setRecords([]);
-    } finally {
-      setIsGenerating(false);
-    }
+  const handleToolSelect = (toolId: string) => {
+    setActiveTool(toolId);
+    setView('workspace');
   };
 
-  const handleExport = (format: 'json' | 'csv' | 'sql' | 'graphql' | 'typescript') => {
-    if (!records.length) return;
-    switch (format) {
-      case 'json':
-        downloadJson(records);
-        break;
-      case 'csv':
-        downloadCsv(records);
-        break;
-      case 'sql':
-        downloadSql(records, tableName);
-        break;
-      case 'graphql':
-        downloadGraphQL(records, 'MockData');
-        break;
-      case 'typescript':
-        downloadTypeScript(records, 'MockData');
-        break;
-    }
+  const handleAddField = () => {
+    setFields([...fields, createNewField()]);
   };
 
-  const previewContent = useMemo(() => {
-    if (!records.length) return '';
-    if (mode === 'graphql') return toGraphQL(records);
-    if (mode === 'typescript') return toTypeScript(records);
-    return toJsonString(records);
-  }, [records, mode]);
+  const handleRemoveField = (id: string) => {
+    setFields(fields.filter(f => f.id !== id));
+  };
 
-  const scrollToGenerator = () => {
-    generatorRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const handleUpdateField = (id: string, updates: Partial<FieldType>) => {
+    setFields(fields.map(f => (f.id === id ? { ...f, ...updates } : f)));
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(previewCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    if (activeTool === 'csv') downloadCsv(generatedData);
+    else if (activeTool === 'sql') downloadSql(generatedData, 'mock_table');
+    else downloadJson(generatedData);
   };
 
   return (
-    <div className="app">
-      <SEO
-        title="Mock Data Generator"
-        description="Generate realistic mock data fast from JSON Schema, SQL, GraphQL, or TypeScript interfaces."
-      />
-      <header className="app__header">
-        <div className="app__brand">
-          <div className="brand-mark">MD</div>
-          <div className="brand-copy">
-            <h1>Mock Data Generator</h1>
-            <p>{t.brandTagline}</p>
-          </div>
-        </div>
-        <div className="app__actions">
-          <div className="language-switcher">
-            {languageOptions.map((opt) => (
-              <button
-                key={opt.value}
-                className={language === opt.value ? 'active' : ''}
-                onClick={() => setLanguage(opt.value)}
+    <DashboardShell activeView={view}>
+      {/* HERO VIEW */}
+      {view === 'hero' && (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 relative">
+          <div className="absolute inset-0 bg-grid-pattern opacity-[0.03] pointer-events-none" />
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center max-w-3xl mx-auto mb-16 z-10"
+          >
+            <h1 className="text-5xl md:text-6xl font-bold mb-6 tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+              Generate test data in seconds.
+            </h1>
+            <p className="text-xl text-gray-400 leading-relaxed">
+              Create realistic JSON, CSV, and SQL datasets without the friction.
+              <br />
+              Runs entirely in your browser.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl z-10">
+            {TOOLS.map((tool) => (
+              <Card
+                key={tool.id}
+                layoutId={`card-${tool.id}`}
+                onClick={() => handleToolSelect(tool.id)}
+                className="group hover:bg-gray-800/80"
               >
-                {opt.shortLabel}
-              </button>
-            ))}
-          </div>
-          <button className="theme-toggle" onClick={() => setIsDarkMode(!isDarkMode)}>
-            {isDarkMode ? '🌙' : '☀️'}
-          </button>
-        </div>
-      </header>
-
-      <header className="hero">
-        <div className="hero__content">
-          <h1>Generate Mock Data Instantly</h1>
-          <p>
-            Create realistic test data for your applications. Support for JSON Schema, SQL, GraphQL, and TypeScript.
-            Private, fast, and runs entirely in your browser.
-          </p>
-          <div className="hero__actions">
-            <button
-              className="hero__cta"
-              onClick={() => {
-                handleModeChange('jsonSchema');
-                scrollToGenerator();
-              }}
-            >
-              Start with JSON
-            </button>
-            <button
-              className="hero__secondary"
-              onClick={() => {
-                handleModeChange('createTable');
-                scrollToGenerator();
-              }}
-            >
-              Start with SQL
-            </button>
-            <button
-              className="hero__secondary"
-              onClick={() => {
-                handleModeChange('graphql');
-                scrollToGenerator();
-              }}
-            >
-              Start with GraphQL
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div ref={generatorRef} className="generator-layout">
-        <div className="generator-toolbar">
-          <div className="mode-selector">
-            {(Object.keys(modeIcons) as GeneratorMode[]).map((m) => (
-              <button key={m} className={mode === m ? 'active' : ''} onClick={() => handleModeChange(m)}>
-                {modeIcons[m]}
-                <span>
-                  {m === 'jsonSchema'
-                    ? 'JSON'
-                    : m === 'createTable'
-                      ? 'SQL'
-                      : m === 'graphql'
-                        ? 'GraphQL'
-                        : m === 'typescript'
-                          ? 'TypeScript'
-                          : 'Manual'}
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="generator-controls">
-            <label>
-              Rows:
-              <input
-                type="number"
-                value={recordCount}
-                onChange={(e) => setRecordCount(Number(e.target.value))}
-                min="1"
-                max="1000"
-              />
-            </label>
-            <button className="generate-btn" onClick={handleGenerate} disabled={isGenerating}>
-              {isGenerating ? 'Generating...' : 'Generate Data'}
-            </button>
-          </div>
-        </div>
-
-        <div className="generator-workspace">
-          <div className="workspace-panel input-panel">
-            {mode === 'manual' ? (
-              <div className="manual-editor">
-                {manualFields.map((field) => (
-                  <ManualFieldEditor
-                    key={field.id}
-                    field={field}
-                    onChange={handleManualFieldChange}
-                    onRemove={handleManualFieldRemove}
-                    copy={t.manualEditor}
-                  />
-                ))}
-                <button type="button" className="add-field" onClick={addManualField}>
-                  {t.manualEditor.addField}
-                </button>
-              </div>
-            ) : (
-              <LinedTextArea
-                value={definition}
-                onChange={(e) => setDefinition(e.target.value)}
-              />
-            )}
-            {schemaErrors.length > 0 && (
-              <div className="error-box">
-                <h4>Error</h4>
-                <ul>
-                  {schemaErrors.map((e, i) => (
-                    <li key={i}>{e}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-          <div className="workspace-panel output-panel">
-            {records.length > 0 ? (
-              <>
-                <div className="output-toolbar">
-                  <span>{records.length} records generated</span>
-                  <div className="export-actions">
-                    <button onClick={() => handleExport('json')}>JSON</button>
-                    <button onClick={() => handleExport('csv')}>CSV</button>
-                    <button onClick={() => handleExport('sql')}>SQL</button>
-                    <button onClick={() => handleExport('graphql')}>GQL</button>
-                    <button onClick={() => handleExport('typescript')}>TS</button>
+                <CardHeader className="flex items-start justify-between pb-2">
+                  <div className="p-2 bg-gray-800 rounded-lg group-hover:bg-gray-700 transition-colors">
+                    <tool.icon className={cn("w-6 h-6", tool.color)} />
                   </div>
-                </div>
-                <pre className="preview-code">{previewContent}</pre>
-              </>
-            ) : (
-              <div className="empty-state">
-                <p>Click "Generate Data" to see results here.</p>
-              </div>
-            )}
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-mono text-gray-500">
+                    Click to open
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <h3 className="text-xl font-semibold text-gray-200 mb-2">{tool.title}</h3>
+                  <p className="text-sm text-gray-500">{tool.description}</p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
-      </div>
+      )}
 
-      <section className="home-story">
-        <div className="home-story__text">
-          <h2>Why MockData.net?</h2>
-          <p>
-            MockData.net helps developers, testers, and data engineers generate realistic test data in seconds. Whether
-            you need user profiles, e-commerce transactions, or IoT logs, our tool creates consistent and valid datasets
-            for your projects.
-          </p>
-          <p>
-            <strong>Privacy First:</strong> All data generation happens locally in your browser. No schemas or generated
-            data are ever sent to our servers.
-          </p>
+      {/* WORKSPACE VIEW */}
+      {view === 'workspace' && (
+        <div className="flex flex-1 overflow-hidden">
+          {/* SIDEBAR CONFIG */}
+          <Sidebar
+            fields={fields}
+            onAddField={handleAddField}
+            onRemoveField={handleRemoveField}
+            onUpdateField={handleUpdateField}
+          />
+
+          {/* MAIN PREVIEW AREA */}
+          <div className="flex-1 flex flex-col bg-[#0d1117]">
+            {/* TOOLBAR */}
+            <div className="h-14 border-b border-gray-800 flex items-center justify-between px-4 bg-[#0d1117]">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setView('hero')}
+                  className="text-gray-400 hover:text-white text-sm font-medium flex items-center gap-2"
+                >
+                  ← Back
+                </button>
+                <div className="h-4 w-[1px] bg-gray-700" />
+                <span className="text-sm font-semibold text-gray-200">
+                  {TOOLS.find(t => t.id === activeTool)?.title}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 mr-4">
+                  <label className="text-xs text-gray-500 font-medium">Rows:</label>
+                  <input
+                    type="number"
+                    value={recordCount}
+                    onChange={(e) => setRecordCount(Number(e.target.value))}
+                    className="w-16 bg-gray-800 border-none rounded text-xs text-center py-1.5 focus:ring-1 focus:ring-primary text-gray-300"
+                  />
+                </div>
+
+                <Button variant="ghost" size="sm" onClick={handleCopy}>
+                  {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                  <span className="ml-2">{copied ? 'Copied' : 'Copy'}</span>
+                </Button>
+
+                <Button size="sm" onClick={handleDownload}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+              </div>
+            </div>
+
+            {/* CODE PREVIEW */}
+            <CodePreview code={previewCode} />
+          </div>
         </div>
-        <div className="home-story__aside">
-          <AdUnit slot="1234567890" />
-        </div>
-      </section>
-    </div>
+      )}
+    </DashboardShell>
   );
+}
+
+// Helper utility for classnames
+function cn(...inputs: (string | undefined | null | false)[]) {
+  return inputs.filter(Boolean).join(' ');
 }
