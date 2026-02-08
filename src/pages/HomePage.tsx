@@ -27,7 +27,8 @@ import {
   downloadSql
 } from '../utils/exporters';
 import { manualFieldsToSchema } from '../utils/manualSchema';
-import { createManualField } from '../pages/HomePage'; // Importing helper from original file if possible, or redefine
+
+
 
 // Re-defining helper since we are replacing the file content
 function createNewField(): FieldType {
