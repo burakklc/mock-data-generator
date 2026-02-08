@@ -1,4 +1,6 @@
 import { saveAs } from './fileSaver';
+import yaml from 'js-yaml';
+import { XMLBuilder } from 'fast-xml-parser';
 
 export function toJsonString(records: unknown[]): string {
   return JSON.stringify(records, null, 2);
@@ -122,6 +124,19 @@ export function toTypeScript(records: Array<Record<string, unknown>>, interfaceN
   return `${interfaceDef}\n\n${data}`;
 }
 
+export function toXmlString(records: unknown[]): string {
+  const builder = new XMLBuilder({
+    ignoreAttributes: false,
+    format: true,
+    indentBy: '  ',
+  });
+  return builder.build({ root: { item: records } });
+}
+
+export function toYamlString(records: unknown[]): string {
+  return yaml.dump(records);
+}
+
 export function downloadJson(records: unknown[], filename = 'mock-data.json'): void {
   saveAs(new Blob([toJsonString(records)], { type: 'application/json' }), filename);
 }
@@ -152,4 +167,12 @@ export function downloadTypeScript(
   filename = 'mock-data.ts',
 ): void {
   saveAs(new Blob([toTypeScript(records, interfaceName)], { type: 'text/plain' }), filename);
+}
+
+export function downloadXml(records: unknown[], filename = 'mock-data.xml'): void {
+  saveAs(new Blob([toXmlString(records)], { type: 'application/xml' }), filename);
+}
+
+export function downloadYaml(records: unknown[], filename = 'mock-data.yaml'): void {
+  saveAs(new Blob([toYamlString(records)], { type: 'text/yaml' }), filename);
 }

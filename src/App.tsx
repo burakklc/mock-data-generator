@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink, Outlet } from 'react-router-dom';
 import HomePage from './pages/HomePage';
+import ConverterPage from './pages/ConverterPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
@@ -15,6 +16,7 @@ interface NavItem {
 
 const navigation: NavItem[] = [
   { path: '/', label: 'Home' },
+  { path: '/converter', label: 'Converter' },
   { path: '/blog', label: 'Blog' },
   { path: '/about', label: 'About' },
   { path: '/contact', label: 'Contact' },
@@ -65,6 +67,7 @@ export default function App() {
       <Routes>
         <Route element={<SiteLayout />}>
           <Route path="/" element={<HomePage />} />
+          <Route path="/converter" element={<ConverterPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />

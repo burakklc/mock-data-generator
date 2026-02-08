@@ -145,8 +145,8 @@ function ensureNumberInRange(
     typeof value === 'number' && Number.isFinite(value)
       ? value
       : hasNumberType
-      ? Number(value)
-      : Number.NaN;
+        ? Number(value)
+        : Number.NaN;
   const valueIsFinite = Number.isFinite(numericValue);
 
   let min =
@@ -317,9 +317,9 @@ function buildSuggestion(error: ErrorObject): string | null {
       const allowed = parentSchema?.enum as unknown[] | undefined;
       return allowed && allowed.length
         ? `Değeri izin verilen seçeneklerden biriyle değiştirin: ${allowed
-            .slice(0, 5)
-            .map((value) => JSON.stringify(value))
-            .join(', ')}${allowed.length > 5 ? ', ...' : ''}.`
+          .slice(0, 5)
+          .map((value) => JSON.stringify(value))
+          .join(', ')}${allowed.length > 5 ? ', ...' : ''}.`
         : 'Değeri şemada belirtilen seçeneklerden biriyle değiştirin.';
     }
     case 'dependentRequired': {
@@ -763,18 +763,88 @@ export async function generateRecords(
   edgeCaseRatio: number,
 ): Promise<GenerationOutcome> {
   const jsf = await getJsonSchemaFaker();
-  const records: any[] = [];
-  const generator = () => {
-    const generated = jsf.generate(schema);
-    const normalized = applyPatternAwareValues(schema, generated);
-    return pruneExtraProperties(schema, normalized);
+
+  // Initialize sequential counters
+  const sequentialCounters: Record<string, number> = {};
+
+  // Helper to find sequential fields and initialize counters
+  const initCounters = (s: any, path = '') => {
+    if (!s) return;
+    if (s['x-sequential']) {
+      const start = typeof s['x-sequential'] === 'object' ? s['x-sequential'].start ?? 1 : 1;
+      sequentialCounters[path] = start;
+    }
+    if (s.type === 'object' && s.properties) {
+      Object.entries(s.properties).forEach(([k, v]) => initCounters(v, path ? `${path}.${k}` : k));
+    }
+    if (s.type === 'array' && s.items) {
+      // Arrays are tricky for global sequential, simplified for now to just check items
+      initCounters(s.items, path ? `${path}[]` : '[]');
+    }
+  };
+  initCounters(schema);
+
+  const processAppLogic = (record: any, index: number) => {
+    // 1. Apply Sequential Values
+    const applySequential = (rec: any, s: any, path = '') => {
+      if (!rec || typeof rec !== 'object') return;
+
+      if (s.type === 'object' && s.properties) {
+        Object.keys(s.properties).forEach(key => {
+          const fieldPath = path ? `${path}.${key}` : key;
+          const fieldSchema = s.properties[key];
+
+          if (fieldSchema['x-sequential']) {
+            const step = typeof fieldSchema['x-sequential'] === 'object' ? fieldSchema['x-sequential'].step ?? 1 : 1;
+            // Use the counter
+            let val = sequentialCounters[fieldPath] ?? 1;
+            rec[key] = val;
+            sequentialCounters[fieldPath] = val + step;
+          } else {
+            applySequential(rec[key], fieldSchema, fieldPath);
+          }
+        });
+      }
+    };
+    applySequential(record, schema);
+
+    // 2. Apply Computed Values (Simple string template for now)
+    // Supports syntax: "Hello ${first_name}"
+    const applyComputed = (rec: any, s: any) => {
+      if (!rec || typeof rec !== 'object') return;
+      if (s.type === 'object' && s.properties) {
+        Object.keys(s.properties).forEach(key => {
+          const fieldSchema = s.properties[key];
+          if (fieldSchema['x-computed'] && typeof fieldSchema['x-computed'] === 'string') {
+            const template = fieldSchema['x-computed'];
+            // Simple replacement of ${field} with value from current level
+            const computed = template.replace(/\$\{([^}]+)\}/g, (_, prop) => {
+              return rec[prop] !== undefined ? String(rec[prop]) : '';
+            });
+            rec[key] = computed;
+          }
+          applyComputed(rec[key], fieldSchema);
+        });
+      }
+    };
+    applyComputed(record, schema);
+
+    return record;
   };
 
+  const generator = (index: number) => {
+    const generated = jsf.generate(schema);
+    const normalized = applyPatternAwareValues(schema, generated);
+    const pruned = pruneExtraProperties(schema, normalized);
+    return processAppLogic(pruned, index);
+  };
+
+  const records: any[] = [];
   const targetEdgeCases = Math.min(count, Math.round((edgeCaseRatio / 100) * count));
   const baseCount = Math.max(0, count - targetEdgeCases);
 
   for (let i = 0; i < baseCount; i += 1) {
-    const record = generator();
+    const record = generator(i);
     records.push(record);
   }
 
@@ -796,16 +866,18 @@ export async function generateRecords(
   });
 
   while (records.length < count) {
-    const record = generator();
+    const record = generator(records.length);
     records.push(record);
   }
 
-  const validator = ajv.compile(schema);
+  // Validate all records against schema
   const validationErrors: ValidationIssue[] = [];
+  const validate = ajv.compile(schema);
+
   records.forEach((record, index) => {
-    const valid = validator(record);
-    if (!valid && validator.errors) {
-      validator.errors.forEach((error) => {
+    const valid = validate(record);
+    if (!valid && validate.errors) {
+      validate.errors.forEach((error) => {
         validationErrors.push(formatAjvError(error, index));
       });
     }
