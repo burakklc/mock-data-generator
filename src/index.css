@@ -25,4 +25,10 @@
     .glass-panel {
         @apply bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-lg;
     }
+
+    .bg-grid-pattern {
+        background-image: linear-gradient(to right, #ffffff 1px, transparent 1px),
+            linear-gradient(to bottom, #ffffff 1px, transparent 1px);
+        background-size: 24px 24px;
+    }
 }
