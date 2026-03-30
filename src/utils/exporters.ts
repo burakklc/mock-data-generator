@@ -1,6 +1,7 @@
 import { saveAs } from './fileSaver';
 import yaml from 'js-yaml';
 import { XMLBuilder } from 'fast-xml-parser';
+import * as XLSX from 'xlsx';
 
 export function toJsonString(records: unknown[]): string {
   return JSON.stringify(records, null, 2);
@@ -37,7 +38,7 @@ export function toCsvString(records: Array<Record<string, unknown>>): string {
   return [headers.join(','), ...rows].join('\n');
 }
 
-export function toSqlInsert(records: Array<Record<string, unknown>>, tableName: string): string {
+export function toSqlInsert(records: Array<Record<string, unknown>>, tableName: string, batchSize: number = 100): string {
   if (!records.length) {
     return '';
   }
@@ -49,17 +50,23 @@ export function toSqlInsert(records: Array<Record<string, unknown>>, tableName: 
     }, new Set<string>()),
   );
 
-  const rows = records
-    .map((record) => {
+  const columnHeaders = columns.join(', ');
+  let result = '';
+
+  for (let i = 0; i < records.length; i += batchSize) {
+    const batch = records.slice(i, i + batchSize);
+    const rows = batch.map(record => {
       const safeRecord = record ?? {};
       const values = columns
         .map((column) => formatSqlValue((safeRecord as Record<string, unknown>)[column]))
         .join(', ');
-      return `INSERT INTO ${tableName} (${columns.join(', ')}) VALUES (${values});`;
-    })
-    .join('\n');
+      return `  (${values})`;
+    }).join(',\n');
 
-  return rows;
+    result += `INSERT INTO ${tableName} (${columnHeaders}) VALUES\n${rows};\n\n`;
+  }
+
+  return result.trim();
 }
 
 function formatSqlValue(value: unknown): string {
@@ -143,6 +150,14 @@ export function downloadJson(records: unknown[], filename = 'mock-data.json'): v
 
 export function downloadCsv(records: Array<Record<string, unknown>>, filename = 'mock-data.csv'): void {
   saveAs(new Blob([toCsvString(records)], { type: 'text/csv' }), filename);
+}
+
+export function downloadExcel(records: Array<Record<string, unknown>>, filename = 'mock-data.xlsx'): void {
+  const worksheet = XLSX.utils.json_to_sheet(records);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Mock Data");
+  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  saveAs(new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
 }
 
 export function downloadSql(

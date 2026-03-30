@@ -1,6 +1,7 @@
 import Ajv, { ErrorObject } from 'ajv';
 import addFormats from 'ajv-formats';
 import RandExp from 'randexp';
+import { fakerEN, fakerTR, fakerDE } from '@faker-js/faker';
 
 const currentYear = new Date().getFullYear();
 
@@ -18,7 +19,7 @@ type JsonSchemaFaker = typeof import('json-schema-faker')['default'];
 
 let jsfPromise: Promise<JsonSchemaFaker> | null = null;
 
-async function getJsonSchemaFaker(): Promise<JsonSchemaFaker> {
+async function getJsonSchemaFaker(locale = 'en', seed?: number): Promise<JsonSchemaFaker> {
   if (!jsfPromise) {
     jsfPromise = (async () => {
       const module = await import('json-schema-faker');
@@ -32,7 +33,13 @@ async function getJsonSchemaFaker(): Promise<JsonSchemaFaker> {
       return instance;
     })();
   }
-  return jsfPromise;
+  const instance = await jsfPromise;
+  
+  const fakerInstance = locale === 'tr' ? fakerTR : locale === 'de' ? fakerDE : fakerEN;
+  if (seed !== undefined) fakerInstance.seed(seed);
+  instance.extend('faker', () => fakerInstance);
+  
+  return instance;
 }
 
 export interface ValidationIssue {
@@ -48,6 +55,13 @@ export interface ValidationIssue {
 export interface GenerationOutcome {
   records: any[];
   validationErrors: ValidationIssue[];
+}
+
+export interface GenerationOptions {
+  count: number;
+  edgeCaseRatio?: number;
+  seed?: number;
+  locale?: 'en' | 'tr' | 'de';
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -757,37 +771,39 @@ function formatAjvError(error: ErrorObject, recordIndex: number): ValidationIssu
   };
 }
 
-export async function generateRecords(
+export async function* generateRecordsStream(
   schema: any,
-  count: number,
-  edgeCaseRatio: number,
-): Promise<GenerationOutcome> {
-  const jsf = await getJsonSchemaFaker();
+  options: GenerationOptions
+): AsyncGenerator<GenerationOutcome, void, unknown> {
+  const { count, edgeCaseRatio = 0, seed, locale = 'en' } = options;
+  const jsf = await getJsonSchemaFaker(locale, seed);
 
-  // Initialize sequential counters
+  // Initialize sequential counters and unique registries
   const sequentialCounters: Record<string, number> = {};
+  const uniqueRegistry: Record<string, Set<any>> = {};
 
-  // Helper to find sequential fields and initialize counters
-  const initCounters = (s: any, path = '') => {
+  const initCountersAndUniques = (s: any, path = '') => {
     if (!s) return;
     if (s['x-sequential']) {
       const start = typeof s['x-sequential'] === 'object' ? s['x-sequential'].start ?? 1 : 1;
       sequentialCounters[path] = start;
     }
+    if (s['x-unique'] || s.uniqueItems) {
+      uniqueRegistry[path] = new Set();
+    }
     if (s.type === 'object' && s.properties) {
-      Object.entries(s.properties).forEach(([k, v]) => initCounters(v, path ? `${path}.${k}` : k));
+      Object.entries(s.properties).forEach(([k, v]) => initCountersAndUniques(v, path ? `${path}.${k}` : k));
     }
     if (s.type === 'array' && s.items) {
-      // Arrays are tricky for global sequential, simplified for now to just check items
-      initCounters(s.items, path ? `${path}[]` : '[]');
+      initCountersAndUniques(s.items, path ? `${path}[]` : '[]');
     }
   };
-  initCounters(schema);
+  initCountersAndUniques(schema);
 
-  const processAppLogic = (record: any, index: number) => {
-    // 1. Apply Sequential Values
-    const applySequential = (rec: any, s: any, path = '') => {
-      if (!rec || typeof rec !== 'object') return;
+  const processAppLogic = (record: any) => {
+    // 1. Apply Sequential Values & Enforce Uniques
+    const applySequentialAndUnique = (rec: any, s: any, path = '') => {
+      if (!rec || typeof rec !== 'object') return rec;
 
       if (s.type === 'object' && s.properties) {
         Object.keys(s.properties).forEach(key => {
@@ -796,29 +812,49 @@ export async function generateRecords(
 
           if (fieldSchema['x-sequential']) {
             const step = typeof fieldSchema['x-sequential'] === 'object' ? fieldSchema['x-sequential'].step ?? 1 : 1;
-            // Use the counter
             let val = sequentialCounters[fieldPath] ?? 1;
             rec[key] = val;
             sequentialCounters[fieldPath] = val + step;
           } else {
-            applySequential(rec[key], fieldSchema, fieldPath);
+            rec[key] = applySequentialAndUnique(rec[key], fieldSchema, fieldPath);
+          }
+
+          if (fieldSchema['x-unique'] && uniqueRegistry[fieldPath]) {
+            let attempt = 0;
+            const maxAttempts = 100;
+            while (uniqueRegistry[fieldPath].has(rec[key]) && attempt < maxAttempts) {
+              rec[key] = jsf.generate(fieldSchema);
+              attempt++;
+            }
+            uniqueRegistry[fieldPath].add(rec[key]);
           }
         });
+      } else if (s.type === 'array' && s.items) {
+          rec.forEach((item: any, idx: number) => {
+              rec[idx] = applySequentialAndUnique(item, s.items, path ? `${path}[]` : '[]');
+          });
       }
+      return rec;
     };
-    applySequential(record, schema);
+    applySequentialAndUnique(record, schema);
 
-    // 2. Apply Computed Values (Simple string template for now)
-    // Supports syntax: "Hello ${first_name}"
+    // 2. Apply Custom Formula Computed Values
     const applyComputed = (rec: any, s: any) => {
       if (!rec || typeof rec !== 'object') return;
       if (s.type === 'object' && s.properties) {
         Object.keys(s.properties).forEach(key => {
           const fieldSchema = s.properties[key];
-          if (fieldSchema['x-computed'] && typeof fieldSchema['x-computed'] === 'string') {
+          if (fieldSchema['x-formula'] && typeof fieldSchema['x-formula'] === 'string') {
+            try {
+              // Create a sterile function context, passing the current record as 'row'
+              const formulaFn = new Function('row', `return ${fieldSchema['x-formula']};`);
+              rec[key] = String(formulaFn(rec));
+            } catch (e) {
+              rec[key] = `Error: Invalid formula`;
+            }
+          } else if (fieldSchema['x-computed'] && typeof fieldSchema['x-computed'] === 'string') {
             const template = fieldSchema['x-computed'];
-            // Simple replacement of ${field} with value from current level
-            const computed = template.replace(/\$\{([^}]+)\}/g, (_, prop) => {
+            const computed = template.replace(/\$\{([^}]+)\}/g, (_: any, prop: any) => {
               return rec[prop] !== undefined ? String(rec[prop]) : '';
             });
             rec[key] = computed;
@@ -832,22 +868,55 @@ export async function generateRecords(
     return record;
   };
 
-  const generator = (index: number) => {
-    const generated = jsf.generate(schema);
-    const normalized = applyPatternAwareValues(schema, generated);
-    const pruned = pruneExtraProperties(schema, normalized);
-    return processAppLogic(pruned, index);
+  const generator = () => {
+    let attempt = 0;
+    while (attempt < 5) {
+      try {
+        const generated = jsf.generate(schema);
+        const normalized = applyPatternAwareValues(schema, generated);
+        const pruned = pruneExtraProperties(schema, normalized);
+        return processAppLogic(pruned);
+      } catch (err) {
+        attempt++;
+      }
+    }
+    // Fallback if generation consistently fails
+    return {};
   };
 
-  const records: any[] = [];
   const targetEdgeCases = Math.min(count, Math.round((edgeCaseRatio / 100) * count));
   const baseCount = Math.max(0, count - targetEdgeCases);
+  
+  const validate = ajv.compile(schema);
+  
+  // Stream in batches of 1000 to keep UI responsive and memory steady
+  const batchSize = 1000;
+  let currentBatchRecords: any[] = [];
+  let currentBatchErrors: ValidationIssue[] = [];
+  let recordsGenerated = 0;
 
   for (let i = 0; i < baseCount; i += 1) {
-    const record = generator(i);
-    records.push(record);
+    const record = generator();
+    currentBatchRecords.push(record);
+    
+    // validate
+    const valid = validate(record);
+    if (!valid && validate.errors) {
+      validate.errors.forEach((error) => {
+        currentBatchErrors.push(formatAjvError(error, recordsGenerated));
+      });
+    }
+
+    recordsGenerated++;
+
+    if (currentBatchRecords.length >= batchSize) {
+      yield { records: currentBatchRecords, validationErrors: currentBatchErrors };
+      currentBatchRecords = [];
+      currentBatchErrors = [];
+    }
   }
 
+  // Edge cases
   const edgeCaseRecords: any[] = [];
   const rootTypes = toTypeList(schema?.type);
   for (let i = 0; i < targetEdgeCases; i += 1) {
@@ -860,28 +929,45 @@ export async function generateRecords(
     }
   }
 
-  edgeCaseRecords.forEach((edgeCase) => {
-    const insertIndex = Math.floor(Math.random() * (records.length + 1));
-    records.splice(insertIndex, 0, edgeCase);
-  });
-
-  while (records.length < count) {
-    const record = generator(records.length);
-    records.push(record);
-  }
-
-  // Validate all records against schema
-  const validationErrors: ValidationIssue[] = [];
-  const validate = ajv.compile(schema);
-
-  records.forEach((record, index) => {
-    const valid = validate(record);
+  for (const edgeCase of edgeCaseRecords) {
+    currentBatchRecords.push(edgeCase);
+    const valid = validate(edgeCase);
     if (!valid && validate.errors) {
       validate.errors.forEach((error) => {
-        validationErrors.push(formatAjvError(error, index));
+        currentBatchErrors.push(formatAjvError(error, recordsGenerated));
       });
     }
-  });
+    recordsGenerated++;
+    
+    if (currentBatchRecords.length >= batchSize) {
+      yield { records: currentBatchRecords, validationErrors: currentBatchErrors };
+      currentBatchRecords = [];
+      currentBatchErrors = [];
+    }
+  }
+
+  // Yield remaining records
+  if (currentBatchRecords.length > 0 || recordsGenerated === 0) {
+    yield { records: currentBatchRecords, validationErrors: currentBatchErrors };
+  }
+}
+
+export async function generateRecords(
+  schema: any,
+  countOrOptions: number | GenerationOptions,
+  edgeCaseRatio = 0
+): Promise<GenerationOutcome> {
+  const options: GenerationOptions = typeof countOrOptions === 'number' 
+    ? { count: countOrOptions, edgeCaseRatio }
+    : countOrOptions;
+
+  const records: any[] = [];
+  const validationErrors: ValidationIssue[] = [];
+
+  for await (const batch of generateRecordsStream(schema, options)) {
+    records.push(...batch.records);
+    validationErrors.push(...batch.validationErrors);
+  }
 
   return { records, validationErrors };
 }

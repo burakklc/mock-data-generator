@@ -4,7 +4,7 @@ export type Language = 'en' | 'tr';
 export interface ManualField {
   id: string;
   name: string;
-  type: 'string' | 'number' | 'integer' | 'boolean' | 'date';
+  type: 'string' | 'number' | 'integer' | 'boolean' | 'date' | 'object' | 'array' | 'formula' | 'enum' | 'uuid' | 'iban' | 'credit_card' | 'cvv' | 'wallet_address' | 'currency_code';
   required: boolean;
   minLength?: number;
   maxLength?: number;
@@ -12,6 +12,22 @@ export interface ManualField {
   minimum?: number;
   maximum?: number;
   enumValues?: string;
+  children?: ManualField[];
+  arrayItemType?: 'string' | 'number' | 'integer' | 'boolean' | 'date' | 'object';
+  unique?: boolean;
+  formula?: string;
+}
+
+export interface ApiEndpoint {
+  id: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  path: string;
+  responseType: 'array' | 'object';
+  recordCount: number;
+  status: number;
+  latency: number;
+  requiresAuth: boolean;
+  fields: ManualField[];
 }
 
 export interface ColumnDefinition {
