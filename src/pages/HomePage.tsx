@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileJson,
@@ -13,7 +13,10 @@ import {
   Braces,
   Share2,
   LayoutTemplate,
-  FileCode
+  FileCode,
+  Save,
+  Upload,
+  AlertOctagon
 } from 'lucide-react';
 
 import LZString from 'lz-string';
@@ -82,11 +85,21 @@ const TOOLS = [
   }
 ];
 
+const loadSavedState = () => {
+  try {
+    const saved = localStorage.getItem('mocknet_project');
+    if (saved) return JSON.parse(saved);
+  } catch (e) {}
+  return null;
+};
+
 export default function HomePage() {
+  const savedState = useMemo(loadSavedState, []);
+
   const [view, setView] = useState<'hero' | 'workspace'>('hero');
-  const [activeTool, setActiveTool] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<string | null>(savedState?.activeTool || null);
   
-  const [fields, setFields] = useState<ManualField[]>([
+  const [fields, setFields] = useState<ManualField[]>(savedState?.fields || [
     { id: '1', name: 'id', type: 'integer', required: true },
     { id: '2', name: 'firstName', type: 'string', required: true },
     { id: '3', name: 'email', type: 'string', pattern: '^\\\\S+@\\\\S+\\\\.\\\\S+$', required: true },
@@ -102,11 +115,14 @@ export default function HomePage() {
     }
   ]);
   
-  const [recordCount, setRecordCount] = useState(10);
-  const [locale, setLocale] = useState<'en' | 'tr' | 'de'>('en');
-  const [seed, setSeed] = useState<number | undefined>();
+  const [recordCount, setRecordCount] = useState<number>(savedState?.recordCount || 10);
+  const [locale, setLocale] = useState<'en' | 'tr' | 'de'>(savedState?.locale || 'en');
+  const [seed, setSeed] = useState<number | undefined>(savedState?.seed);
+  
+  const [injectEdgeCases, setInjectEdgeCases] = useState(false);
+  const hiddenFileInput = useRef<HTMLInputElement>(null);
+
   const [generatedData, setGeneratedData] = useState<any[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // Bidirectional Sync State
@@ -135,6 +151,12 @@ export default function HomePage() {
       }
     }
   }, []);
+
+  // Auto-Save Strategy
+  useEffect(() => {
+    const payload = { fields, recordCount, locale, seed, activeTool };
+    localStorage.setItem('mocknet_project', JSON.stringify(payload));
+  }, [fields, recordCount, locale, seed, activeTool]);
 
   // Update JSON text when fields change (if not in JSON mode)
   useEffect(() => {
@@ -172,7 +194,7 @@ export default function HomePage() {
           count: recordCount,
           locale,
           seed
-        }, 0);
+        }, injectEdgeCases ? 5 : 0);
         setGeneratedData(outcome.records);
       }
     };
@@ -225,6 +247,37 @@ export default function HomePage() {
     if (activeTool === 'csv') downloadExcel(generatedData);
     else if (activeTool === 'sql') downloadSql(generatedData, 'mock_table');
     else downloadJson(generatedData);
+  };
+
+  const exportProjectFile = () => {
+    const payload = { fields, recordCount, locale, seed, activeTool };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mocknet-project-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importProjectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(String(ev.target?.result));
+        if (parsed.fields) setFields(parsed.fields);
+        if (parsed.recordCount) setRecordCount(parsed.recordCount);
+        if (parsed.locale) setLocale(parsed.locale);
+        if (parsed.seed !== undefined) setSeed(parsed.seed);
+        if (parsed.activeTool) setActiveTool(parsed.activeTool);
+      } catch (err) {
+        alert("Invalid project file format.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // resets input
   };
 
   return (
@@ -324,6 +377,14 @@ export default function HomePage() {
                   <button onClick={handleShare} className="p-1.5 hover:bg-gray-800 rounded text-gray-400 hover:text-blue-400" title="Share Link">
                     {shareCopied ? <Check className="w-4 h-4 text-green-400"/> : <Share2 className="w-4 h-4" />}
                   </button>
+                  <div className="w-[1px] h-4 bg-gray-700 mx-1" />
+                  <button onClick={exportProjectFile} className="p-1.5 hover:bg-gray-800 rounded text-gray-400 hover:text-green-400" title="Save Project to Disk">
+                    <Save className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => hiddenFileInput.current?.click()} className="p-1.5 hover:bg-gray-800 rounded text-gray-400 hover:text-orange-400" title="Load Project File">
+                    <Upload className="w-4 h-4" />
+                  </button>
+                  <input type="file" accept=".json,.mocknet" ref={hiddenFileInput} onChange={importProjectFile} className="hidden" />
                 </div>
               </div>
             
@@ -391,6 +452,19 @@ export default function HomePage() {
                     className="w-20 bg-gray-800 border border-gray-700 rounded text-xs text-center py-1 focus:ring-1 focus:ring-primary text-gray-300 focus:outline-none placeholder:text-gray-600"
                   />
                 </div>
+                <div className="flex items-center gap-2" title="Inject Edge Cases (Nulls, Boundaries, Errors)">
+                  <label className="text-xs text-gray-500 font-medium cursor-pointer flex items-center gap-1 hover:text-red-400 transition-colors">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-gray-600 bg-gray-800 text-red-500 focus:ring-red-500 w-3 h-3"
+                      checked={injectEdgeCases}
+                      onChange={e => setInjectEdgeCases(e.target.checked)}
+                    />
+                    <AlertOctagon className="w-3.5 h-3.5" /> Chaos
+                  </label>
+                </div>
+
+                <div className="h-4 w-[1px] bg-gray-700 mx-1" />
 
                 <div className="flex items-center gap-2">
                   <label className="text-xs text-gray-500 font-medium">Rows:</label>
