@@ -9,6 +9,8 @@ const routes = [
   '/csv-generator',
   '/sql-generator',
   '/mock-api-simulator',
+  '/jwt-generator',
+  '/regex-generator',
   '/converter',
   '/about',
   '/contact',

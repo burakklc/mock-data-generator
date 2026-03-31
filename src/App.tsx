@@ -98,6 +98,8 @@ export default function App() {
             <Route path="/csv-generator" element={<HomePage defaultTool="csv" />} />
             <Route path="/sql-generator" element={<HomePage defaultTool="sql" />} />
             <Route path="/mock-api-simulator" element={<HomePage defaultTool="api" />} />
+            <Route path="/jwt-generator" element={<HomePage defaultTool="jwt" />} />
+            <Route path="/regex-generator" element={<HomePage defaultTool="regex" />} />
             <Route path="/converter" element={<ConverterPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />

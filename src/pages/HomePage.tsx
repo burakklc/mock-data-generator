@@ -18,7 +18,9 @@ import {
   FileCode,
   Save,
   Upload,
-  AlertOctagon
+  AlertOctagon,
+  Key,
+  Regex
 } from 'lucide-react';
 
 import LZString from 'lz-string';
@@ -27,6 +29,8 @@ import { Card, CardHeader, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Sidebar } from '../components/Sidebar';
 import { ApiMockWorkspace } from '../components/ApiMockWorkspace';
+import JwtWorkspace from '../components/JwtWorkspace';
+import RegexWorkspace from '../components/RegexWorkspace';
 import { CodePreview } from '../components/CodePreview';
 import { TemplateGallery } from '../components/TemplateGallery';
 import LinedTextArea from '../components/LinedTextArea';
@@ -84,6 +88,22 @@ const TOOLS = [
     icon: Code2,
     color: 'text-purple-400',
     preview: 'GET /api/users'
+  },
+  {
+    id: 'jwt',
+    title: 'JWT Decoder / Signer',
+    description: 'Stateless offline JSON Web Token generator.',
+    icon: Key,
+    color: 'text-pink-400',
+    preview: 'eyJhb...'
+  },
+  {
+    id: 'regex',
+    title: 'Regex Data',
+    description: 'Create millions of matched pattern records.',
+    icon: Regex,
+    color: 'text-orange-400',
+    preview: '^[A-Z]{3}-\\d{4}$'
   }
 ];
 
@@ -386,6 +406,46 @@ export default function HomePage({ defaultTool }: { defaultTool?: string }) {
             </div>
             <div className="flex-1 overflow-hidden">
                <ApiMockWorkspace />
+            </div>
+          </div>
+        ) : activeTool === 'jwt' ? (
+          <div className="flex flex-col flex-1 h-screen relative">
+            <div className="h-14 border-b border-gray-800 flex items-center justify-between px-4 bg-[#0d1117] flex-shrink-0 z-20">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleBack}
+                  className="text-gray-400 hover:text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                >
+                  ← Back
+                </button>
+                <div className="h-4 w-[1px] bg-gray-700" />
+                <span className="text-sm font-semibold text-gray-200">
+                  JWT Token Decoder & Generator
+                </span>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+               <JwtWorkspace />
+            </div>
+          </div>
+        ) : activeTool === 'regex' ? (
+          <div className="flex flex-col flex-1 h-screen relative">
+            <div className="h-14 border-b border-gray-800 flex items-center justify-between px-4 bg-[#0d1117] flex-shrink-0 z-20">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleBack}
+                  className="text-gray-400 hover:text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                >
+                  ← Back
+                </button>
+                <div className="h-4 w-[1px] bg-gray-700" />
+                <span className="text-sm font-semibold text-gray-200">
+                  Bulk Regex Data Generator
+                </span>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+               <RegexWorkspace />
             </div>
           </div>
         ) : (
