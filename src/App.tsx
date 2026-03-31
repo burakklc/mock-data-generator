@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Outlet } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import HomePage from './pages/HomePage';
 import ConverterPage from './pages/ConverterPage';
 import AboutPage from './pages/AboutPage';
@@ -88,10 +89,15 @@ function SiteLayout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route element={<SiteLayout />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/converter" element={<ConverterPage />} />
+      <HelmetProvider>
+        <Routes>
+          <Route element={<SiteLayout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/json-generator" element={<HomePage defaultTool="json" />} />
+            <Route path="/csv-generator" element={<HomePage defaultTool="csv" />} />
+            <Route path="/sql-generator" element={<HomePage defaultTool="sql" />} />
+            <Route path="/mock-api-simulator" element={<HomePage defaultTool="api" />} />
+            <Route path="/converter" element={<ConverterPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
@@ -100,7 +106,8 @@ export default function App() {
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:slug" element={<BlogPostPage />} />
         </Route>
-      </Routes>
+        </Routes>
+      </HelmetProvider>
     </BrowserRouter>
   );
 }

@@ -1,5 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import {
   FileJson,
   Database,
@@ -93,11 +95,12 @@ const loadSavedState = () => {
   return null;
 };
 
-export default function HomePage() {
+export default function HomePage({ defaultTool }: { defaultTool?: string }) {
   const savedState = useMemo(loadSavedState, []);
+  const navigate = useNavigate();
 
-  const [view, setView] = useState<'hero' | 'workspace'>('hero');
-  const [activeTool, setActiveTool] = useState<string | null>(savedState?.activeTool || null);
+  const [view, setView] = useState<'hero' | 'workspace'>(defaultTool ? 'workspace' : 'hero');
+  const [activeTool, setActiveTool] = useState<string | null>(defaultTool || savedState?.activeTool || null);
   
   const [fields, setFields] = useState<ManualField[]>(savedState?.fields || [
     { id: '1', name: 'id', type: 'integer', required: true },
@@ -211,6 +214,15 @@ export default function HomePage() {
   const handleToolSelect = (toolId: string) => {
     setActiveTool(toolId);
     setView('workspace');
+    if (toolId === 'json') navigate('/json-generator');
+    else if (toolId === 'csv') navigate('/csv-generator');
+    else if (toolId === 'sql') navigate('/sql-generator');
+    else if (toolId === 'api') navigate('/mock-api-simulator');
+  };
+
+  const handleBack = () => {
+    setView('hero');
+    navigate('/');
   };
 
   const handleCopy = () => {
@@ -282,6 +294,23 @@ export default function HomePage() {
 
   return (
     <DashboardShell activeView={view}>
+      <Helmet>
+        <title>
+          {activeTool === 'json' ? "Free JSON Mock Data Generator | MockData.net" :
+           activeTool === 'csv' ? "Generate Fake CSV Data | MockData.net" :
+           activeTool === 'sql' ? "Mock SQL Insert Statement Generator | MockData.net" :
+           activeTool === 'api' ? "Free Mock API Simulator | MockData.net" :
+           "MockData.net - Free Online Test Data Generator"}
+        </title>
+        <meta name="description" content={
+          activeTool === 'json' ? "Generate robust JSON datasets with complex schema validation instantly." :
+          activeTool === 'csv' ? "Create spreadsheet-ready CSV mock data for rigorous analysis." :
+          activeTool === 'sql' ? "Generate massive batches of SQL INSERT statements for your database testing." :
+          activeTool === 'api' ? "Mock API endpoints with dynamic JSON responses, realistic latencies and auth simulation." :
+          "Create realistic JSON, CSV, and SQL datasets without the friction. Runs entirely in your browser."
+        } />
+      </Helmet>
+
       {/* HERO VIEW */}
       {view === 'hero' && (
         <div className="flex-1 flex flex-col items-center justify-center p-8 relative">
@@ -335,7 +364,7 @@ export default function HomePage() {
             <div className="h-14 border-b border-gray-800 flex items-center justify-between px-4 bg-[#0d1117] flex-shrink-0 z-20">
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => setView('hero')}
+                  onClick={handleBack}
                   className="text-gray-400 hover:text-white text-sm font-medium flex items-center gap-2 transition-colors"
                 >
                   ← Back
@@ -417,7 +446,7 @@ export default function HomePage() {
             <div className="h-14 border-b border-gray-800 flex items-center justify-between px-4 bg-[#0d1117] overflow-x-auto whitespace-nowrap scrollbar-hide">
               <div className="flex items-center gap-4 flex-shrink-0">
                 <button
-                  onClick={() => setView('hero')}
+                  onClick={handleBack}
                   className="text-gray-400 hover:text-white text-sm font-medium flex items-center gap-2 transition-colors"
                 >
                   ← Back
