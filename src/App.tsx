@@ -9,6 +9,7 @@ import TermsPage from './pages/TermsPage';
 import CookiePolicyPage from './pages/CookiePolicyPage';
 import BlogPage from './pages/BlogPage';
 import BlogPostPage from './pages/BlogPostPage';
+import CookieConsent from './components/CookieConsent';
 
 interface NavItem {
   path: string;
@@ -107,6 +108,7 @@ export default function App() {
           <Route path="/blog/:slug" element={<BlogPostPage />} />
         </Route>
         </Routes>
+        <CookieConsent />
       </HelmetProvider>
     </BrowserRouter>
   );

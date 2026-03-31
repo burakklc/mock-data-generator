@@ -313,46 +313,55 @@ export default function HomePage({ defaultTool }: { defaultTool?: string }) {
 
       {/* HERO VIEW */}
       {view === 'hero' && (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 relative">
-          <div className="absolute inset-0 bg-grid-pattern opacity-[0.03] pointer-events-none" />
+        <div className="flex-1 overflow-y-auto scrollbar-hide">
+          <div className="flex flex-col items-center justify-center p-8 relative min-h-[85vh]">
+            <div className="absolute inset-0 bg-grid-pattern opacity-[0.03] pointer-events-none" />
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center max-w-3xl mx-auto mb-16 z-10"
-          >
-            <h1 className="text-5xl md:text-6xl font-bold mb-6 tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-              Generate test data in seconds.
-            </h1>
-            <p className="text-xl text-gray-400 leading-relaxed">
-              Create realistic JSON, CSV, and SQL datasets without the friction.
-              <br />
-              Runs entirely in your browser.
-            </p>
-          </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center max-w-3xl mx-auto mb-16 z-10"
+            >
+              <h1 className="text-5xl md:text-6xl font-bold mb-6 tracking-tight bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+                Generate test data in seconds.
+              </h1>
+              <p className="text-xl text-gray-400 leading-relaxed">
+                Create realistic JSON, CSV, and SQL datasets without the friction.
+                <br />
+                Runs entirely in your browser.
+              </p>
+            </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl z-10">
-            {TOOLS.map((tool) => (
-              <Card
-                key={tool.id}
-                layoutId={`card-${tool.id}`}
-                onClick={() => handleToolSelect(tool.id)}
-                className="group hover:bg-gray-800/80"
-              >
-                <CardHeader className="flex items-start justify-between pb-2">
-                  <div className="p-2 bg-gray-800 rounded-lg group-hover:bg-gray-700 transition-colors">
-                    <tool.icon className={cn("w-6 h-6", tool.color)} />
-                  </div>
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-mono text-gray-500">
-                    Click to open
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <h3 className="text-xl font-semibold text-gray-200 mb-2">{tool.title}</h3>
-                  <p className="text-sm text-gray-500">{tool.description}</p>
-                </CardContent>
-              </Card>
-            ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-4xl z-10">
+              {TOOLS.map((tool) => (
+                <Card
+                  key={tool.id}
+                  layoutId={`card-${tool.id}`}
+                  onClick={() => handleToolSelect(tool.id)}
+                  className="group hover:bg-gray-800/80"
+                >
+                  <CardHeader className="flex items-start justify-between pb-2">
+                    <div className="p-2 bg-gray-800 rounded-lg group-hover:bg-gray-700 transition-colors">
+                      <tool.icon className={cn("w-6 h-6", tool.color)} />
+                    </div>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-mono text-gray-500">
+                      Click to open
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <h3 className="text-xl font-semibold text-gray-200 mb-2">{tool.title}</h3>
+                    <p className="text-sm text-gray-500">{tool.description}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          <div className="max-w-4xl mx-auto py-16 px-8 text-gray-400 text-sm md:text-base leading-relaxed border-t border-gray-800/50 bg-[#0d1117]/50 mt-8 rounded-xl">
+             <h2 className="text-2xl font-bold text-gray-200 mb-4">What is MockData.net?</h2>
+             <p className="mb-4">MockData.net is an advanced, free, entirely browser-based tool suite designed for developers, testers, and data scientists. By leveraging the power of modern client-side javascript, the platform allows you to generate massive datasets of realistic fake data instantly—without ever sending your schemas or parameters to a remote server.</p>
+             <h2 className="text-2xl font-bold text-gray-200 mb-4 mt-8">Why Use a Mock Data Generator?</h2>
+             <p>When building web applications, designing database schemas, or writing analytical queries, testing with realistic data is paramount. Hardcoding data leads to brittle tests and missed edge cases. Our JSON, SQL, and CSV generators hook into native Faker libraries to provide contextual, structurally accurate information across various industry standards ranging from E-Commerce telemetry to complex Fintech constraints. Ensure your QA processes are bulletproof.</p>
           </div>
         </div>
       )}
@@ -525,7 +534,10 @@ export default function HomePage({ defaultTool }: { defaultTool?: string }) {
             </div>
 
             {/* CODE PREVIEW */}
-            <CodePreview code={previewCode} />
+            <div className="flex-1 flex flex-col overflow-y-auto scrollbar-hide">
+              <CodePreview code={previewCode} />
+              <SeoContentBlock tool={activeTool} />
+            </div>
           </div>
         </div>
         )
@@ -540,7 +552,40 @@ export default function HomePage({ defaultTool }: { defaultTool?: string }) {
   );
 }
 
+function SeoContentBlock({ tool }: { tool: string | null }) {
+  if (!tool) return null;
+  return (
+    <div className="p-8 border-t border-gray-800/50 bg-[#0d1117] text-gray-400 text-sm">
+      {tool === 'json' && (
+        <article className="max-w-4xl mx-auto">
+          <h2 className="text-xl font-bold text-gray-200 mb-3">How to Use the Free JSON Mock Data Generator</h2>
+          <p className="mb-2 leading-relaxed">MockData.net provides a powerful, schema-driven JSON generator for developers and QA engineers. Create deeply nested structures, arrays, and objects with ease using our visual builder or the raw JSON definition input.</p>
+          <h3 className="text-lg font-semibold text-gray-300 mt-4 mb-2">Why Fake JSON Data?</h3>
+          <p className="leading-relaxed">Testing frontend interfaces, loading states, and edge cases requires realistic JSON payloads. Instead of manually typing out examples or relying on production database dumps, you can deterministically seed and generate thousands of valid JSON entities natively in your browser ensuring complete privacy.</p>
+        </article>
+      )}
+      {tool === 'sql' && (
+        <article className="max-w-4xl mx-auto">
+          <h2 className="text-xl font-bold text-gray-200 mb-3">Free SQL Mock Data Generator for Database Testing</h2>
+          <p className="mb-2 leading-relaxed">Generate thousands of SQL INSERT statements instantly. Configure your database schema visually, mapping custom columns to realistic data types like UUIDs, Emails, Addresses and banking IBANs.</p>
+          <h3 className="text-lg font-semibold text-gray-300 mt-4 mb-2">Automated Execution Batching</h3>
+          <p className="leading-relaxed">Our SQL generator automatically batches output queries to ensure high-performance execution. Download the raw .sql file or copy the queries directly to your clipboard for instant migration testing across MySQL, Postgres, and SQLite.</p>
+        </article>
+      )}
+      {tool === 'csv' && (
+        <article className="max-w-4xl mx-auto">
+          <h2 className="text-xl font-bold text-gray-200 mb-3">Generate Fake CSV Data for Spreadsheets</h2>
+          <p className="mb-2 leading-relaxed">Create spreadsheet-ready mock data. Ideal for Excel, Google Sheets, data science modeling (Pandas), and rigorous statistical analysis.</p>
+          <h3 className="text-lg font-semibold text-gray-300 mt-4 mb-2">High Volume Offline Export Output</h3>
+          <p className="leading-relaxed">MockData.net renders the entire dataset offline in your browser, enabling you to export massive CSVs in milliseconds entirely client-side without bandwidth limits.</p>
+        </article>
+      )}
+    </div>
+  );
+}
+
 // Helper utility for classnames
 function cn(...inputs: (string | undefined | null | false)[]) {
   return inputs.filter(Boolean).join(' ');
 }
+
